@@ -1,0 +1,251 @@
+@import "tailwindcss";
+
+:root {
+  --background: #1f1715;
+  --foreground: #fff8ef;
+  --ink: #110d0f;
+  --wine: #3b0719;
+  --rose: #d62f55;
+  --blush: #e38aa0;
+  --gold: #dec47b;
+  --sand: #d9c1ad;
+  --muted: #b6aaa6;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Noto Sans KR", "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(16, 10, 12, 0.65), transparent 420px),
+    radial-gradient(circle at 50% 0%, rgba(92, 8, 37, 0.22), transparent 42rem),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(214, 47, 85, 0.5);
+  color: white;
+}
+
+.font-display {
+  font-family: var(--font-display), "Times New Roman", serif;
+}
+
+.section-shell {
+  margin-inline: auto;
+  width: min(100% - 2rem, 1180px);
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.heading-balance {
+  text-wrap: balance;
+}
+
+.gold-text {
+  color: var(--gold);
+}
+
+.button-primary,
+.button-outline,
+.button-ghost {
+  align-items: center;
+  border-radius: 6px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  gap: 0.55rem;
+  height: 3rem;
+  justify-content: center;
+  letter-spacing: 0.12em;
+  padding-inline: 1.25rem;
+  text-transform: uppercase;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.button-primary {
+  background: var(--rose);
+  color: white;
+}
+
+.button-primary:hover {
+  background: #e24568;
+  transform: translateY(-1px);
+}
+
+.button-outline {
+  border: 1px solid rgba(255, 248, 239, 0.68);
+  color: white;
+}
+
+.button-outline:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.button-ghost {
+  color: white;
+}
+
+.button-ghost:hover {
+  color: var(--gold);
+}
+
+.header-consult {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .header-consult {
+    display: inline-flex;
+  }
+}
+
+.flower-mark {
+  aspect-ratio: 1;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  display: inline-block;
+  height: 1.1rem;
+  position: relative;
+}
+
+.flower-mark::before,
+.flower-mark::after {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  content: "";
+  inset: -1px;
+  position: absolute;
+}
+
+.flower-mark::before {
+  transform: rotate(60deg);
+}
+
+.flower-mark::after {
+  transform: rotate(-60deg);
+}
+
+.glass-panel {
+  background: rgba(11, 9, 11, 0.78);
+  border: 1px solid rgba(255, 248, 239, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
+}
+
+.treatment-marquee {
+  overflow: hidden;
+  width: 100%;
+}
+
+.treatment-track {
+  animation: marquee 34s linear infinite;
+  display: flex;
+  gap: 2rem;
+  width: max-content;
+}
+
+.treatment-marquee:hover .treatment-track {
+  animation-play-state: paused;
+}
+
+.comparison-range {
+  appearance: none;
+  background: transparent;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+  cursor: ew-resize;
+}
+
+.comparison-range::-webkit-slider-thumb {
+  appearance: none;
+  height: 3.25rem;
+  width: 3.25rem;
+}
+
+.comparison-range::-moz-range-thumb {
+  background: transparent;
+  border: 0;
+  height: 3.25rem;
+  width: 3.25rem;
+}
+
+.form-field {
+  border-radius: 6px;
+  border: 1px solid rgba(255, 248, 239, 0.11);
+  background: rgba(255, 248, 239, 0.08);
+  color: white;
+  min-height: 3.25rem;
+  outline: none;
+  padding: 0.85rem 1rem;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.form-field:focus {
+  border-color: var(--gold);
+  background: rgba(255, 248, 239, 0.13);
+}
+
+.form-field::placeholder {
+  color: rgba(255, 248, 239, 0.58);
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-50% - 1rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .treatment-track {
+    animation: none;
+  }
+}

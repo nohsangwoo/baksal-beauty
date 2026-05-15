@@ -1,0 +1,4 @@
+interface:
+  display_name: "BAKSAL Beauty Images 2.0"
+  short_description: "Generate and manage GPT Image 2 assets for BAKSAL Beauty"
+  default_prompt: "Use $baksal-beauty-images2 to create clinic website image assets with OpenAI Images 2.0."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "BAKSAL Beauty Design System"
+  short_description: "Design rules for the BAKSAL Beauty clinic website"
+  default_prompt: "Use $baksal-beauty-design-system to extend this clinic website without drifting from its visual system."
