@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Languages, Phone } from "lucide-react";
 import {
   getOtherLocales,
+  isLocale,
   localeLabels,
   localeNames,
   type Locale,
@@ -20,8 +23,48 @@ type LanguageLinksProps = {
   ariaLabel: string;
 };
 
+type ScrollRestoreSnapshot = {
+  compact: boolean;
+  restore: boolean;
+  ratio?: number;
+  y?: number;
+};
+
+const SCROLL_RESTORE_KEY = "baksal-beauty:locale-scroll";
+
 export function SiteHeader({ t, locale }: SiteHeaderProps) {
-  const [compact, setCompact] = useState(false);
+  const [initialScrollSnapshot] = useState(getInitialScrollSnapshot);
+  const [compact, setCompact] = useState(initialScrollSnapshot.compact);
+  const [transitionsEnabled, setTransitionsEnabled] = useState(
+    !initialScrollSnapshot.restore,
+  );
+
+  useLayoutEffect(() => {
+    if (!initialScrollSnapshot.restore) {
+      return;
+    }
+
+    window.sessionStorage.removeItem(SCROLL_RESTORE_KEY);
+
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const targetY = Number.isFinite(initialScrollSnapshot.ratio)
+      ? maxScroll * Number(initialScrollSnapshot.ratio)
+      : Number(initialScrollSnapshot.y) || 0;
+
+    window.scrollTo(0, targetY);
+  }, [initialScrollSnapshot]);
+
+  useEffect(() => {
+    if (transitionsEnabled) {
+      return;
+    }
+
+    const transitionFrame = window.requestAnimationFrame(() => {
+      setTransitionsEnabled(true);
+    });
+
+    return () => window.cancelAnimationFrame(transitionFrame);
+  }, [transitionsEnabled]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,16 +77,23 @@ export function SiteHeader({ t, locale }: SiteHeaderProps) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const shellTransitionClass = transitionsEnabled
+    ? "transition-all duration-300 ease-out"
+    : "transition-none";
+  const headerTransitionClass = transitionsEnabled
+    ? "transition-[top,background-color,box-shadow,backdrop-filter] duration-300 ease-out"
+    : "transition-none";
+
   return (
     <header
-      className={`fixed left-0 right-0 z-50 transition-all duration-300 ${
+      className={`fixed left-0 right-0 z-50 overflow-hidden ${headerTransitionClass} ${
         compact
-          ? "top-0 border-b border-white/10 bg-[#0d0b0c]/88 shadow-2xl shadow-black/30 backdrop-blur-xl"
-          : "top-8 bg-transparent"
+          ? "top-0 bg-[#0d0b0c]/90 shadow-[0_18px_50px_rgba(0,0,0,0.34)] backdrop-blur-xl"
+          : "top-8 bg-transparent shadow-none backdrop-blur-0"
       }`}
     >
       <div
-        className={`section-shell flex items-center justify-between transition-all duration-300 ${
+        className={`section-shell flex items-center justify-between ${shellTransitionClass} ${
           compact ? "h-16" : "h-24"
         }`}
       >
@@ -53,13 +103,13 @@ export function SiteHeader({ t, locale }: SiteHeaderProps) {
           aria-label={t.common.brandHome}
         >
           <span
-            className={`flower-mark shrink-0 text-[#dec47b] transition-all duration-300 ${
+            className={`flower-mark shrink-0 text-[#dec47b] ${shellTransitionClass} ${
               compact ? "h-4" : "h-5"
             }`}
             aria-hidden="true"
           />
           <span
-            className={`font-display truncate font-semibold transition-all duration-300 ${
+            className={`font-display truncate font-semibold ${shellTransitionClass} ${
               compact ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
             }`}
           >
@@ -88,6 +138,8 @@ export function SiteHeader({ t, locale }: SiteHeaderProps) {
 }
 
 export function LanguageLinks({ locale, ariaLabel }: LanguageLinksProps) {
+  const pathname = usePathname();
+
   return (
     <div
       className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-2 text-[0.68rem] font-black uppercase text-white/78 backdrop-blur transition hover:border-[#dec47b]/50"
@@ -95,15 +147,78 @@ export function LanguageLinks({ locale, ariaLabel }: LanguageLinksProps) {
     >
       <Languages size={13} className="text-[#dec47b]" aria-hidden="true" />
       {getOtherLocales(locale).map((targetLocale) => (
-        <a
+        <Link
           key={targetLocale}
           className="transition hover:text-[#dec47b]"
-          href={`/${targetLocale}`}
+          href={buildLocaleHref(pathname, targetLocale)}
+          scroll={false}
+          onClick={saveScrollPosition}
           aria-label={`${ariaLabel}: ${localeNames[targetLocale]}`}
         >
           {localeLabels[targetLocale]}
-        </a>
+        </Link>
       ))}
     </div>
   );
+}
+
+function buildLocaleHref(pathname: string, targetLocale: Locale) {
+  const segments = pathname.split("/").filter(Boolean);
+
+  if (segments.length > 0 && isLocale(segments[0])) {
+    segments[0] = targetLocale;
+  } else {
+    segments.unshift(targetLocale);
+  }
+
+  return `/${segments.join("/")}`;
+}
+
+function saveScrollPosition() {
+  const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  const ratio = window.scrollY / maxScroll;
+
+  window.sessionStorage.setItem(
+    SCROLL_RESTORE_KEY,
+    JSON.stringify({
+      ratio,
+      y: window.scrollY,
+    }),
+  );
+}
+
+function getInitialScrollSnapshot(): ScrollRestoreSnapshot {
+  if (typeof window === "undefined") {
+    return {
+      compact: false,
+      restore: false,
+    };
+  }
+
+  const rawPosition = window.sessionStorage.getItem(SCROLL_RESTORE_KEY);
+
+  if (!rawPosition) {
+    return {
+      compact: window.scrollY > 48,
+      restore: false,
+    };
+  }
+
+  try {
+    const { ratio, y } = JSON.parse(rawPosition) as { ratio?: number; y?: number };
+    const savedY = Number(y) || 0;
+    const savedRatio = Number(ratio);
+
+    return {
+      compact: savedY > 48 || savedRatio > 0.01,
+      restore: true,
+      ratio: savedRatio,
+      y: savedY,
+    };
+  } catch {
+    return {
+      compact: window.scrollY > 48,
+      restore: false,
+    };
+  }
 }

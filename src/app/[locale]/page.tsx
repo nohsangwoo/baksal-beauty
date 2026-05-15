@@ -14,6 +14,7 @@ import {
   Star,
 } from "lucide-react";
 import { BeforeAfterSlider, TreatmentPillars } from "@/components/home-interactions";
+import { PageMotion } from "@/components/page-motion";
 import { LanguageLinks, SiteHeader } from "@/components/site-header";
 import { isLocale, locales, type Locale } from "@/i18n/config";
 import { getDictionary, type HomeDictionary } from "@/i18n/dictionaries";
@@ -56,7 +57,8 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#1f1715] text-[#fff8ef]">
-      <SiteHeader t={t} locale={rawLocale} />
+      <SiteHeader key={rawLocale} t={t} locale={rawLocale} />
+      <PageMotion />
       <HeroSection t={t} />
       <PhilosophySection t={t} />
       <ServicesSection t={t} />
@@ -76,15 +78,23 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
 }
 
 function HeroSection({ t }: { t: HomeDictionary }) {
+  const heroTrustItems = [
+    ...t.trustSignals,
+    ...t.philosophy.metrics.map((metric) => metric.label),
+    t.common.guidedAfterConsultation,
+    t.inquiry.primaryCta,
+  ];
+  const duplicatedHeroTrustItems = [...heroTrustItems, ...heroTrustItems];
+
   return (
-    <section className="relative min-h-[86svh] overflow-hidden border-b border-white/10">
+    <section data-reveal-section="" className="relative min-h-screen overflow-hidden border-b border-white/10">
       <Image
         src="/images/hero.png"
         alt={t.hero.imageAlt}
         fill
         priority
         sizes="100vw"
-        className="object-cover object-center"
+        className="hero-visual object-cover object-center"
       />
       <div className="absolute inset-0 bg-black/45" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/58 via-[#3b0719]/20 to-black/20" />
@@ -93,7 +103,7 @@ function HeroSection({ t }: { t: HomeDictionary }) {
         {t.hero.announcement}
       </div>
 
-      <div className="relative z-10 section-shell grid min-h-[calc(86svh-8rem)] items-center py-14">
+      <div className="relative z-10 section-shell grid min-h-[calc(100svh-2.25rem)] items-center pb-32 pt-28 md:pb-36 md:pt-24">
         <div className="max-w-3xl">
           <p className="eyebrow text-[#dec47b]">{t.hero.eyebrow}</p>
           <h1 className="font-display mt-5 text-6xl leading-none text-white md:text-8xl">
@@ -116,10 +126,10 @@ function HeroSection({ t }: { t: HomeDictionary }) {
         </div>
       </div>
 
-      <div className="relative z-10 border-t border-white/10 bg-black/30 py-4 backdrop-blur">
-        <div className="section-shell grid gap-3 text-center text-[0.7rem] font-bold uppercase text-white/72 sm:grid-cols-2 lg:grid-cols-4">
-          {t.trustSignals.map((signal) => (
-            <div key={signal} className="flex items-center justify-center gap-3">
+      <div data-reveal="soft" className="hero-trust-marquee absolute inset-x-0 bottom-0 z-10">
+        <div className="hero-trust-track">
+          {duplicatedHeroTrustItems.map((signal, index) => (
+            <div key={`${signal}-${index}`} className="hero-trust-item">
               <span className="flower-mark text-[#dec47b]" aria-hidden="true" />
               {signal}
             </div>
@@ -132,10 +142,14 @@ function HeroSection({ t }: { t: HomeDictionary }) {
 
 function PhilosophySection({ t }: { t: HomeDictionary }) {
   return (
-    <section id="about" className="py-24 md:py-32">
+    <section data-reveal-section="" id="about" className="py-24 md:py-32">
       <div className="section-shell grid items-center gap-14 lg:grid-cols-[0.95fr_1fr]">
         <div className="relative mx-auto w-full max-w-[560px]">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-lg border border-white/10">
+          <div
+            data-magnetic=""
+            data-magnetic-strength="7"
+            className="relative aspect-[4/5] overflow-hidden rounded-lg border border-white/10"
+          >
             <Image
               src="/images/philosophy-portrait.jpg"
               alt={t.philosophy.imageAlt}
@@ -144,7 +158,11 @@ function PhilosophySection({ t }: { t: HomeDictionary }) {
               className="object-cover"
             />
           </div>
-          <div className="absolute -bottom-8 right-6 h-40 w-52 overflow-hidden rounded-lg border border-white/20 shadow-2xl md:h-56 md:w-72">
+          <div
+            data-magnetic=""
+            data-magnetic-strength="5"
+            className="absolute -bottom-8 right-6 h-40 w-52 overflow-hidden rounded-lg border border-white/20 shadow-2xl md:h-56 md:w-72"
+          >
             <Image
               src="/images/clinic-interior.jpg"
               alt={t.philosophy.interiorAlt}
@@ -184,7 +202,11 @@ function PhilosophySection({ t }: { t: HomeDictionary }) {
 
 function ServicesSection({ t }: { t: HomeDictionary }) {
   return (
-    <section id="services" className="border-y border-white/10 bg-[#241b18] py-24 md:py-32">
+    <section
+      data-reveal-section=""
+      id="services"
+      className="border-y border-white/10 bg-[#241b18] py-24 md:py-32"
+    >
       <div className="section-shell">
         <div className="mx-auto mb-14 max-w-4xl text-center">
           <p className="eyebrow text-[#d9c1ad]">{t.services.eyebrow}</p>
@@ -203,7 +225,7 @@ function PopularTreatmentsSection({ t }: { t: HomeDictionary }) {
   const duplicatedTreatments = [...t.popular.treatments, ...t.popular.treatments];
 
   return (
-    <section className="py-24 md:py-32">
+    <section data-reveal-section="" className="py-24 md:py-32">
       <div className="mb-12 text-center">
         <p className="eyebrow text-[#d9c1ad]">{t.popular.eyebrow}</p>
         <h2 className="font-display mt-4 text-5xl md:text-7xl">
@@ -249,7 +271,11 @@ function PopularTreatmentsSection({ t }: { t: HomeDictionary }) {
 
 function ComparisonSection({ t }: { t: HomeDictionary }) {
   return (
-    <section id="compare" className="border-y border-white/10 bg-[#160d12] py-24 md:py-32">
+    <section
+      data-reveal-section=""
+      id="compare"
+      className="border-y border-white/10 bg-[#160d12] py-24 md:py-32"
+    >
       <div className="section-shell grid items-center gap-14 lg:grid-cols-[0.9fr_1fr]">
         <div>
           <p className="eyebrow text-[#d9c1ad]">{t.comparison.eyebrow}</p>
@@ -281,7 +307,7 @@ function ComparisonSection({ t }: { t: HomeDictionary }) {
 
 function InquiryBand({ t }: { t: HomeDictionary }) {
   return (
-    <section className="relative overflow-hidden py-20">
+    <section data-reveal-section="" className="relative overflow-hidden py-20">
       <div className="absolute inset-0">
         <Image
           src="/images/consultation-face.jpg"
@@ -300,7 +326,7 @@ function InquiryBand({ t }: { t: HomeDictionary }) {
             <span className="block">{t.inquiry.titleB}</span>
           </h2>
         </div>
-        <div className="glass-panel p-6 md:p-8">
+        <div data-magnetic="" data-magnetic-strength="5" className="glass-panel p-6 md:p-8">
           <p className="leading-8 text-[#d9d0c9]">{t.inquiry.body}</p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <a className="button-primary" href="#consult">
@@ -319,7 +345,7 @@ function InquiryBand({ t }: { t: HomeDictionary }) {
 
 function DoctorsSection({ t }: { t: HomeDictionary }) {
   return (
-    <section id="doctors" className="bg-[#241b18] py-24 md:py-32">
+    <section data-reveal-section="" id="doctors" className="bg-[#241b18] py-24 md:py-32">
       <div className="section-shell">
         <div className="mx-auto max-w-4xl text-center">
           <p className="eyebrow text-[#d9c1ad]">{t.doctors.eyebrow}</p>
@@ -331,7 +357,12 @@ function DoctorsSection({ t }: { t: HomeDictionary }) {
         </div>
         <div className="mt-16 grid gap-6 lg:grid-cols-3">
           {t.doctors.list.map((doctor) => (
-            <article key={doctor.name} className="glass-panel p-6 md:p-8">
+            <article
+              key={doctor.name}
+              data-magnetic=""
+              data-magnetic-strength="4"
+              className="glass-panel p-6 md:p-8"
+            >
               <p className="font-display text-3xl text-white">{doctor.name}</p>
               <p className="mt-2 text-sm font-bold text-[#e38aa0]">{doctor.role}</p>
               <div className="mx-auto my-10 aspect-square w-52 overflow-hidden rounded-full border border-white/10 bg-white/5">
@@ -365,7 +396,7 @@ function DoctorsSection({ t }: { t: HomeDictionary }) {
 
 function ReviewsSection({ t }: { t: HomeDictionary }) {
   return (
-    <section className="py-24 md:py-32">
+    <section data-reveal-section="" className="py-24 md:py-32">
       <div className="section-shell">
         <div className="mx-auto max-w-4xl text-center">
           <p className="eyebrow text-[#d9c1ad]">{t.reviews.eyebrow}</p>
@@ -394,7 +425,7 @@ function ReviewsSection({ t }: { t: HomeDictionary }) {
 
 function GuideSection({ t }: { t: HomeDictionary }) {
   return (
-    <section id="guide" className="bg-[#241b18] py-24 md:py-32">
+    <section data-reveal-section="" id="guide" className="bg-[#241b18] py-24 md:py-32">
       <div className="section-shell">
         <div className="mx-auto max-w-4xl text-center">
           <p className="eyebrow text-[#d9c1ad]">{t.guide.eyebrow}</p>
@@ -406,7 +437,12 @@ function GuideSection({ t }: { t: HomeDictionary }) {
         </div>
         <div className="mt-14 grid gap-6 lg:grid-cols-3">
           {t.guide.cards.map((card) => (
-            <article key={card.title} className="glass-panel overflow-hidden">
+            <article
+              key={card.title}
+              data-magnetic=""
+              data-magnetic-strength="5"
+              className="glass-panel overflow-hidden"
+            >
               <div className="relative h-72">
                 <Image src={card.image} alt={card.title} fill sizes="380px" className="object-cover" />
               </div>
@@ -439,8 +475,12 @@ function GuideSection({ t }: { t: HomeDictionary }) {
 
 function ConsultationSection({ t }: { t: HomeDictionary }) {
   return (
-    <section id="consult" className="grid bg-[#130f10] lg:grid-cols-2">
-      <div className="relative min-h-[520px]">
+    <section data-reveal-section="" id="consult" className="grid bg-[#130f10] lg:grid-cols-2">
+      <div
+        data-magnetic=""
+        data-magnetic-strength="6"
+        className="relative min-h-[520px] overflow-hidden"
+      >
         <Image
           src="/images/consultation-face.jpg"
           alt={t.consultation.imageAlt}
@@ -513,7 +553,7 @@ function ConsultationSection({ t }: { t: HomeDictionary }) {
 
 function ShopSection({ t }: { t: HomeDictionary }) {
   return (
-    <section id="shop" className="bg-[#241b18] py-24 md:py-32">
+    <section data-reveal-section="" id="shop" className="bg-[#241b18] py-24 md:py-32">
       <div className="section-shell">
         <div className="mx-auto max-w-4xl text-center">
           <p className="eyebrow text-[#d9c1ad]">{t.shop.eyebrow}</p>
@@ -525,7 +565,11 @@ function ShopSection({ t }: { t: HomeDictionary }) {
         <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {t.shop.products.map((product, index) => (
             <article key={product.name} className="group">
-              <div className="relative aspect-square overflow-hidden rounded-lg border border-white/10 bg-white">
+              <div
+                data-magnetic=""
+                data-magnetic-strength="5"
+                className="relative aspect-square overflow-hidden rounded-lg border border-white/10 bg-white"
+              >
                 <Image
                   src="/images/shop-products.jpg"
                   alt={product.name}
@@ -555,7 +599,7 @@ function ShopSection({ t }: { t: HomeDictionary }) {
 
 function BlogSection({ t }: { t: HomeDictionary }) {
   return (
-    <section id="blog" className="py-24 md:py-32">
+    <section data-reveal-section="" id="blog" className="py-24 md:py-32">
       <div className="section-shell">
         <div className="mx-auto max-w-4xl text-center">
           <p className="eyebrow text-[#d9c1ad]">{t.blog.eyebrow}</p>
@@ -566,7 +610,11 @@ function BlogSection({ t }: { t: HomeDictionary }) {
         <div className="mt-14 grid gap-7 lg:grid-cols-3">
           {t.blog.posts.map((post) => (
             <article key={post.title} className="group">
-              <div className="relative aspect-[1.45] overflow-hidden rounded-lg border border-white/10">
+              <div
+                data-magnetic=""
+                data-magnetic-strength="5"
+                className="relative aspect-[1.45] overflow-hidden rounded-lg border border-white/10"
+              >
                 <Image
                   src={post.image}
                   alt={post.title}
@@ -591,7 +639,7 @@ function BlogSection({ t }: { t: HomeDictionary }) {
 
 function NewsletterSection({ t }: { t: HomeDictionary }) {
   return (
-    <section className="relative overflow-hidden py-24 md:py-32">
+    <section data-reveal-section="" className="relative overflow-hidden py-24 md:py-32">
       <Image
         src="/images/newsletter.jpg"
         alt={t.newsletter.imageAlt}

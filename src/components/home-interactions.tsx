@@ -48,7 +48,11 @@ export function TreatmentPillars({ pillars, ctaLabel }: TreatmentPillarsProps) {
           </a>
         </div>
 
-        <div className="relative min-h-[360px] overflow-hidden rounded-lg border border-white/10 md:min-h-[520px]">
+        <div
+          data-magnetic=""
+          data-magnetic-strength="7"
+          className="relative min-h-[360px] overflow-hidden rounded-lg border border-white/10 md:min-h-[520px]"
+        >
           <Image
             key={active.image}
             src={active.image}
