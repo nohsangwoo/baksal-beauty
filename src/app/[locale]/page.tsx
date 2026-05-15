@@ -5,7 +5,6 @@ import {
   ArrowRight,
   CalendarDays,
   Check,
-  Languages,
   Mail,
   MapPin,
   MessageCircle,
@@ -15,13 +14,8 @@ import {
   Star,
 } from "lucide-react";
 import { BeforeAfterSlider, TreatmentPillars } from "@/components/home-interactions";
-import {
-  getAlternateLocale,
-  isLocale,
-  localeLabels,
-  locales,
-  type Locale,
-} from "@/i18n/config";
+import { LanguageLinks, SiteHeader } from "@/components/site-header";
+import { isLocale, locales, type Locale } from "@/i18n/config";
 import { getDictionary, type HomeDictionary } from "@/i18n/dictionaries";
 
 type LocalePageProps = {
@@ -62,7 +56,8 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#1f1715] text-[#fff8ef]">
-      <HeroSection t={t} locale={rawLocale} />
+      <SiteHeader t={t} locale={rawLocale} />
+      <HeroSection t={t} />
       <PhilosophySection t={t} />
       <ServicesSection t={t} />
       <PopularTreatmentsSection t={t} />
@@ -80,7 +75,7 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
   );
 }
 
-function HeroSection({ t, locale }: { t: HomeDictionary; locale: Locale }) {
+function HeroSection({ t }: { t: HomeDictionary }) {
   return (
     <section className="relative min-h-[86svh] overflow-hidden border-b border-white/10">
       <Image
@@ -97,27 +92,6 @@ function HeroSection({ t, locale }: { t: HomeDictionary; locale: Locale }) {
       <div className="relative z-10 border-b border-white/10 bg-[#e7d1c7]/90 py-2 text-center text-[0.72rem] font-bold text-[#211515]">
         {t.hero.announcement}
       </div>
-
-      <header className="relative z-10 section-shell flex h-24 items-center justify-between">
-        <a href={`/${locale}`} className="flex items-center gap-3" aria-label={t.common.brandHome}>
-          <span className="flower-mark text-[#dec47b]" aria-hidden="true" />
-          <span className="font-display text-3xl font-semibold">BAKSAL BEAUTY</span>
-        </a>
-        <nav className="hidden items-center gap-8 text-xs font-black uppercase text-white/84 md:flex">
-          {t.nav.map((item) => (
-            <a key={item.label} className="transition hover:text-[#dec47b]" href={item.href}>
-              {item.label}
-            </a>
-          ))}
-        </nav>
-        <div className="hidden items-center gap-3 md:flex">
-          <LanguageLink locale={locale} label={t.language.switchLabel} />
-          <a className="button-outline header-consult" href="#consult">
-            <Phone size={15} />
-            {t.common.phoneCta}
-          </a>
-        </div>
-      </header>
 
       <div className="relative z-10 section-shell grid min-h-[calc(86svh-8rem)] items-center py-14">
         <div className="max-w-3xl">
@@ -408,7 +382,7 @@ function ReviewsSection({ t }: { t: HomeDictionary }) {
                   <Star key={index} size={18} fill="currentColor" />
                 ))}
               </div>
-              <p className="mx-auto max-w-md leading-8 text-white/84">“{review.quote}”</p>
+              <p className="mx-auto max-w-md leading-8 text-white/84">{review.quote}</p>
               <p className="font-display mt-6 text-2xl text-[#d9c1ad]">{review.name}</p>
             </article>
           ))}
@@ -653,7 +627,7 @@ function Footer({ t, locale }: { t: HomeDictionary; locale: Locale }) {
               {item.label}
             </a>
           ))}
-          <LanguageLink locale={locale} label={t.language.switchLabel} />
+          <LanguageLinks locale={locale} ariaLabel={t.language.switchLabel} />
         </nav>
         <div className="grid gap-10 lg:grid-cols-[0.8fr_1.1fr_0.8fr]">
           <div>
@@ -680,7 +654,7 @@ function Footer({ t, locale }: { t: HomeDictionary; locale: Locale }) {
             <div className="mt-6 space-y-4 text-sm font-bold">
               <a className="flex items-center gap-3 hover:text-[#dec47b]" href="tel:01030069310">
                 <Phone size={17} />
-                010 · 3006 · 9310
+                010 - 3006 - 9310
               </a>
               <a className="flex items-center gap-3 hover:text-[#dec47b]" href="mailto:milli@molluhub.com">
                 <Mail size={17} />
@@ -694,20 +668,5 @@ function Footer({ t, locale }: { t: HomeDictionary; locale: Locale }) {
         </div>
       </div>
     </footer>
-  );
-}
-
-function LanguageLink({ locale, label }: { locale: Locale; label: string }) {
-  const alternateLocale = getAlternateLocale(locale);
-
-  return (
-    <a
-      className="inline-flex items-center gap-2 text-xs font-black uppercase text-white/78 transition hover:text-[#dec47b]"
-      href={`/${alternateLocale}`}
-      aria-label={`Switch language to ${label}`}
-    >
-      <Languages size={14} />
-      {localeLabels[alternateLocale]}
-    </a>
   );
 }
