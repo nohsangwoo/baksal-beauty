@@ -13,6 +13,7 @@ import {
   Sparkles,
   Star,
 } from "lucide-react";
+import { FloatingContactActions, SocialChannelButtons } from "@/components/contact-actions";
 import { BeforeAfterSlider, TreatmentPillars } from "@/components/home-interactions";
 import { PageMotion } from "@/components/page-motion";
 import { LanguageLinks, SiteHeader } from "@/components/site-header";
@@ -59,6 +60,7 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
     <main className="min-h-screen overflow-hidden bg-[#1f1715] text-[#fff8ef]">
       <SiteHeader key={rawLocale} t={t} locale={rawLocale} />
       <PageMotion />
+      <FloatingContactActions />
       <HeroSection t={t} />
       <PhilosophySection t={t} />
       <ServicesSection t={t} />
@@ -71,6 +73,7 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
       <ConsultationSection t={t} />
       <ShopSection t={t} />
       <BlogSection t={t} />
+      <ContactSection t={t} />
       <NewsletterSection t={t} />
       <Footer t={t} locale={rawLocale} />
     </main>
@@ -225,7 +228,7 @@ function PopularTreatmentsSection({ t }: { t: HomeDictionary }) {
   const duplicatedTreatments = [...t.popular.treatments, ...t.popular.treatments];
 
   return (
-    <section data-reveal-section="" className="py-24 md:py-32">
+    <section data-reveal-section="" id="popular" className="py-24 md:py-32">
       <div className="mb-12 text-center">
         <p className="eyebrow text-[#d9c1ad]">{t.popular.eyebrow}</p>
         <h2 className="font-display mt-4 text-5xl md:text-7xl">
@@ -637,6 +640,78 @@ function BlogSection({ t }: { t: HomeDictionary }) {
   );
 }
 
+function ContactSection({ t }: { t: HomeDictionary }) {
+  const contactRows = [
+    { label: "Representative", value: "노상우" },
+    { label: "Address", value: "인천광역시 연수구 인천타워대로 323, 에이동 20층" },
+    { label: "Phone", value: "010 - 3006 - 9310", href: "tel:01030069310" },
+    { label: "Email", value: "milli@molluhub.com", href: "mailto:milli@molluhub.com" },
+  ];
+
+  return (
+    <section
+      data-reveal-section=""
+      id="contact"
+      className="border-y border-white/10 bg-[#120d0e] py-24 md:py-32"
+    >
+      <div className="section-shell">
+        <div className="mb-12 max-w-3xl">
+          <p className="eyebrow text-[#dec47b]">Contact Us</p>
+          <h2 className="font-display mt-4 text-5xl leading-tight md:text-7xl">
+            Visit, call, or start a private conversation.
+          </h2>
+          <p className="mt-6 leading-8 text-[#d9d0c9]">
+            {t.footer.companyName}의 공식 연락처입니다. 프로젝트 상담과 운영 문의를 같은 채널에서 확인합니다.
+          </p>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[1.45fr_0.8fr]">
+          <div
+            data-magnetic=""
+            data-magnetic-strength="4"
+            className="contact-map-frame relative min-h-[420px] overflow-hidden rounded-lg border border-white/10 md:min-h-[560px]"
+          >
+            <iframe
+              aria-label="LUDGI office map"
+              className="absolute inset-0 h-full w-full grayscale-[0.25] invert-[0.88] saturate-[0.65]"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              src="https://www.openstreetmap.org/export/embed.html?bbox=126.6396%2C37.3901%2C126.6514%2C37.3978&layer=mapnik&marker=37.39395%2C126.6455"
+              title="LUDGI office map"
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#120d0e]/35 via-transparent to-[#120d0e]/10" />
+          </div>
+
+          <aside className="glass-panel flex flex-col justify-between p-6 md:p-8">
+            <div>
+              <span className="flower-mark text-[#dec47b]" aria-hidden="true" />
+              <h3 className="font-display mt-5 text-4xl">BAKSAL BEAUTY Contact</h3>
+              <div className="mt-8 divide-y divide-white/10">
+                {contactRows.map((row) => (
+                  <div key={row.label} className="grid gap-2 py-5">
+                    <p className="eyebrow text-[#d9c1ad]">{row.label}</p>
+                    {row.href ? (
+                      <a className="leading-7 text-white transition hover:text-[#dec47b]" href={row.href}>
+                        {row.value}
+                      </a>
+                    ) : (
+                      <p className="leading-7 text-white">{row.value}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <p className="mb-4 text-sm font-bold text-[#b6aaa6]">Connect directly</p>
+              <SocialChannelButtons />
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function NewsletterSection({ t }: { t: HomeDictionary }) {
   return (
     <section data-reveal-section="" className="relative overflow-hidden py-24 md:py-32">
@@ -666,12 +741,21 @@ function NewsletterSection({ t }: { t: HomeDictionary }) {
 }
 
 function Footer({ t, locale }: { t: HomeDictionary; locale: Locale }) {
+  const footerRoutes = ["about", "service", "blog", "inquire"];
+
   return (
     <footer className="border-t border-white/10 bg-[#0d0b0c] py-16">
       <div className="section-shell">
         <nav className="mb-14 flex flex-wrap justify-center gap-8 text-xs font-black uppercase text-white/72">
-          {t.nav.map((item) => (
-            <a key={item.label} className="hover:text-[#dec47b]" href={item.href}>
+          <a className="hover:text-[#dec47b]" href={`/${locale}`}>
+            Home
+          </a>
+          {t.nav.map((item, index) => (
+            <a
+              key={item.label}
+              className="hover:text-[#dec47b]"
+              href={`/${locale}/${footerRoutes[index] ?? ""}`}
+            >
               {item.label}
             </a>
           ))}

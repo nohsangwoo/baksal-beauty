@@ -340,6 +340,48 @@ textarea {
   color: rgba(255, 248, 239, 0.58);
 }
 
+.social-action-button,
+.floating-action-button {
+  align-items: center;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 248, 239, 0.14);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  justify-content: center;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.social-action-button {
+  background: rgba(255, 248, 239, 0.08);
+  height: 2.75rem;
+}
+
+.floating-action-button {
+  background: rgba(13, 11, 12, 0.84);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.34);
+  height: 2.65rem;
+  backdrop-filter: blur(14px);
+}
+
+.social-action-button:hover,
+.floating-action-button:hover {
+  background: var(--rose);
+  border-color: var(--rose);
+  color: white;
+  transform: translateY(-2px);
+}
+
+.contact-map-frame {
+  background:
+    linear-gradient(135deg, rgba(222, 196, 123, 0.12), transparent 36%),
+    rgba(255, 248, 239, 0.04);
+}
+
 @keyframes marquee {
   from {
     transform: translateX(0);

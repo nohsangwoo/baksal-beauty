@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useState } from "react";
-import { Languages, Phone } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronDown, Languages, Phone } from "lucide-react";
 import {
   getOtherLocales,
   isLocale,
@@ -31,40 +31,53 @@ type ScrollRestoreSnapshot = {
 };
 
 const SCROLL_RESTORE_KEY = "baksal-beauty:locale-scroll";
+const pageRouteSegments = ["about", "service", "blog", "inquire"] as const;
 
 export function SiteHeader({ t, locale }: SiteHeaderProps) {
-  const [initialScrollSnapshot] = useState(getInitialScrollSnapshot);
-  const [compact, setCompact] = useState(initialScrollSnapshot.compact);
-  const [transitionsEnabled, setTransitionsEnabled] = useState(
-    !initialScrollSnapshot.restore,
-  );
+  const [compact, setCompact] = useState(false);
+  const [transitionsEnabled, setTransitionsEnabled] = useState(false);
+  const [homeMenuOpen, setHomeMenuOpen] = useState(false);
+  const homeMenuRef = useRef<HTMLDivElement>(null);
+  const homeMenuCloseTimerRef = useRef<number | null>(null);
+  const transitionFrameRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
-    if (!initialScrollSnapshot.restore) {
-      return;
+    const initialScrollSnapshot = getInitialScrollSnapshot();
+    let shouldCompact = window.scrollY > 48;
+
+    if (initialScrollSnapshot.restore) {
+      window.sessionStorage.removeItem(SCROLL_RESTORE_KEY);
+
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const targetY = Number.isFinite(initialScrollSnapshot.ratio)
+        ? maxScroll * Number(initialScrollSnapshot.ratio)
+        : Number(initialScrollSnapshot.y) || 0;
+
+      window.scrollTo(0, targetY);
+      shouldCompact = targetY > 48;
     }
 
-    window.sessionStorage.removeItem(SCROLL_RESTORE_KEY);
+    const compactFrame = window.requestAnimationFrame(() => {
+      setCompact(shouldCompact);
+    });
+    const firstFrame = window.requestAnimationFrame(() => {
+      const secondFrame = window.requestAnimationFrame(() => {
+        setTransitionsEnabled(true);
+      });
 
-    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-    const targetY = Number.isFinite(initialScrollSnapshot.ratio)
-      ? maxScroll * Number(initialScrollSnapshot.ratio)
-      : Number(initialScrollSnapshot.y) || 0;
-
-    window.scrollTo(0, targetY);
-  }, [initialScrollSnapshot]);
-
-  useEffect(() => {
-    if (transitionsEnabled) {
-      return;
-    }
-
-    const transitionFrame = window.requestAnimationFrame(() => {
-      setTransitionsEnabled(true);
+      transitionFrameRef.current = secondFrame;
     });
 
-    return () => window.cancelAnimationFrame(transitionFrame);
-  }, [transitionsEnabled]);
+    return () => {
+      window.cancelAnimationFrame(compactFrame);
+      window.cancelAnimationFrame(firstFrame);
+
+      if (transitionFrameRef.current) {
+        window.cancelAnimationFrame(transitionFrameRef.current);
+        transitionFrameRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -77,16 +90,69 @@ export function SiteHeader({ t, locale }: SiteHeaderProps) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!homeMenuRef.current?.contains(event.target as Node)) {
+        setHomeMenuOpen(false);
+      }
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setHomeMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", closeOnOutsideClick);
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsideClick);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
   const shellTransitionClass = transitionsEnabled
     ? "transition-all duration-300 ease-out"
     : "transition-none";
   const headerTransitionClass = transitionsEnabled
     ? "transition-[top,background-color,box-shadow,backdrop-filter] duration-300 ease-out"
     : "transition-none";
+  const homeSectionLinks = [
+    { label: "Hero", href: `/${locale}` },
+    { label: t.philosophy.eyebrow, href: `/${locale}#about` },
+    { label: t.services.eyebrow, href: `/${locale}#services` },
+    { label: t.popular.eyebrow, href: `/${locale}#popular` },
+    { label: t.comparison.eyebrow, href: `/${locale}#compare` },
+    { label: t.doctors.eyebrow, href: `/${locale}#doctors` },
+    { label: t.guide.eyebrow, href: `/${locale}#guide` },
+    { label: t.consultation.eyebrow, href: `/${locale}#consult` },
+    { label: t.shop.eyebrow, href: `/${locale}#shop` },
+    { label: t.blog.eyebrow, href: `/${locale}#blog` },
+    { label: "Contact", href: `/${locale}#contact` },
+  ];
+  const openHomeMenu = () => {
+    if (homeMenuCloseTimerRef.current) {
+      window.clearTimeout(homeMenuCloseTimerRef.current);
+      homeMenuCloseTimerRef.current = null;
+    }
+
+    setHomeMenuOpen(true);
+  };
+  const closeHomeMenuSoon = () => {
+    if (homeMenuCloseTimerRef.current) {
+      window.clearTimeout(homeMenuCloseTimerRef.current);
+    }
+
+    homeMenuCloseTimerRef.current = window.setTimeout(() => {
+      setHomeMenuOpen(false);
+      homeMenuCloseTimerRef.current = null;
+    }, 120);
+  };
 
   return (
     <header
-      className={`fixed left-0 right-0 z-50 overflow-hidden ${headerTransitionClass} ${
+      className={`fixed left-0 right-0 z-50 overflow-visible ${headerTransitionClass} ${
         compact
           ? "top-0 bg-[#0d0b0c]/90 shadow-[0_18px_50px_rgba(0,0,0,0.34)] backdrop-blur-xl"
           : "top-8 bg-transparent shadow-none backdrop-blur-0"
@@ -97,7 +163,7 @@ export function SiteHeader({ t, locale }: SiteHeaderProps) {
           compact ? "h-16" : "h-24"
         }`}
       >
-        <a
+        <Link
           href={`/${locale}`}
           className="flex min-w-0 items-center gap-3"
           aria-label={t.common.brandHome}
@@ -115,22 +181,73 @@ export function SiteHeader({ t, locale }: SiteHeaderProps) {
           >
             BAKSAL BEAUTY
           </span>
-        </a>
+        </Link>
 
         <nav className="hidden items-center gap-7 text-xs font-black uppercase text-white/84 lg:flex">
-          {t.nav.map((item) => (
-            <a key={item.label} className="transition hover:text-[#dec47b]" href={item.href}>
+          <div
+            ref={homeMenuRef}
+            className="relative"
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setHomeMenuOpen(false);
+              }
+            }}
+            onMouseEnter={openHomeMenu}
+            onMouseLeave={closeHomeMenuSoon}
+          >
+            <button
+              aria-expanded={homeMenuOpen}
+              aria-haspopup="menu"
+              className="inline-flex items-center gap-1.5 transition hover:text-[#dec47b]"
+              onClick={() => setHomeMenuOpen((isOpen) => !isOpen)}
+              onFocus={openHomeMenu}
+              type="button"
+            >
+              Home
+              <ChevronDown
+                size={13}
+                className={`transition ${homeMenuOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            <div
+              className={`absolute left-1/2 top-full mt-3 w-64 -translate-x-1/2 rounded-lg border border-white/10 bg-[#0d0b0c]/95 p-2 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl transition duration-200 ${
+                homeMenuOpen
+                  ? "pointer-events-auto translate-y-0 opacity-100"
+                  : "pointer-events-none translate-y-2 opacity-0"
+              }`}
+              role="menu"
+            >
+              {homeSectionLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  className="block rounded-md px-3 py-2.5 text-[0.68rem] text-white/72 transition hover:bg-white/8 hover:text-[#dec47b]"
+                  href={item.href}
+                  onClick={() => setHomeMenuOpen(false)}
+                  role="menuitem"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {t.nav.map((item, index) => (
+            <Link
+              key={item.label}
+              className="transition hover:text-[#dec47b]"
+              href={`/${locale}/${pageRouteSegments[index] ?? ""}`}
+            >
               {item.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
         <div className="flex items-center gap-3">
           <LanguageLinks locale={locale} ariaLabel={t.language.switchLabel} />
-          <a className="button-outline header-consult" href="#consult">
+          <Link className="button-outline header-consult" href={`/${locale}#consult`}>
             <Phone size={15} />
             {t.common.phoneCta}
-          </a>
+          </Link>
         </div>
       </div>
     </header>
