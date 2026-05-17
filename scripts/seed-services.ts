@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Pool } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
+import { adminUserSeeds, blogPostSeeds, inquirySeeds } from "../src/data/admin-seed";
 import { serviceSeeds } from "../src/data/service-content";
 import type { Locale } from "../src/i18n/config";
 
@@ -118,10 +119,125 @@ async function main() {
     console.log(`seeded ${seed.slug}`);
   }
 
+  await seedAdminUsers(pool);
+  await seedBlogPosts(pool);
+  await seedInquiries(pool);
+
   await pool.end();
 }
 
-async function uploadSeedAsset(imageUrl: string, slug: string) {
+async function seedAdminUsers(pool: Pool) {
+  for (const seed of adminUserSeeds) {
+    await pool.query(
+      `
+        INSERT INTO admin_users (name, email, role, status)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (email)
+        DO UPDATE SET
+          name = EXCLUDED.name,
+          role = EXCLUDED.role,
+          status = EXCLUDED.status,
+          updated_at = now()
+      `,
+      [seed.name, seed.email, seed.role, seed.status],
+    );
+
+    console.log(`seeded admin user ${seed.email}`);
+  }
+}
+
+async function seedBlogPosts(pool: Pool) {
+  for (const seed of blogPostSeeds) {
+    const imageUrl = await uploadSeedAsset(seed.imageUrl, seed.slug, "blog");
+
+    await pool.query(
+      `
+        INSERT INTO blog_posts
+          (title, slug, excerpt, category, status, image_url, tags)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (slug)
+        DO UPDATE SET
+          title = EXCLUDED.title,
+          excerpt = EXCLUDED.excerpt,
+          category = EXCLUDED.category,
+          status = EXCLUDED.status,
+          image_url = EXCLUDED.image_url,
+          tags = EXCLUDED.tags,
+          updated_at = now()
+      `,
+      [
+        seed.title,
+        seed.slug,
+        seed.excerpt,
+        seed.category,
+        seed.status,
+        imageUrl,
+        seed.tags,
+      ],
+    );
+
+    console.log(`seeded blog ${seed.slug}`);
+  }
+}
+
+async function seedInquiries(pool: Pool) {
+  for (const seed of inquirySeeds) {
+    const existing = await pool.query<{ id: string }>(
+      "SELECT id::text FROM inquiries WHERE seed_key = $1 LIMIT 1",
+      [seed.seedKey],
+    );
+
+    if (existing.rows[0]?.id) {
+      await pool.query(
+        `
+          UPDATE inquiries
+          SET
+            name = $2,
+            phone = $3,
+            email = $4,
+            interest = $5,
+            preferred_channel = $6,
+            message = $7,
+            status = $8,
+            updated_at = now()
+          WHERE seed_key = $1
+        `,
+        [
+          seed.seedKey,
+          seed.name,
+          seed.phone,
+          seed.email,
+          seed.interest,
+          seed.preferredChannel,
+          seed.message,
+          seed.status,
+        ],
+      );
+    } else {
+      await pool.query(
+        `
+          INSERT INTO inquiries
+            (seed_key, name, phone, email, interest, preferred_channel, message, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `,
+        [
+          seed.seedKey,
+          seed.name,
+          seed.phone,
+          seed.email,
+          seed.interest,
+          seed.preferredChannel,
+          seed.message,
+          seed.status,
+        ],
+      );
+    }
+
+    console.log(`seeded inquiry ${seed.seedKey}`);
+  }
+}
+
+async function uploadSeedAsset(imageUrl: string, slug: string, folder = "services") {
   if (!process.env.BLOB_READ_WRITE_TOKEN || !imageUrl.startsWith("/images/")) {
     return imageUrl;
   }
@@ -135,7 +251,7 @@ async function uploadSeedAsset(imageUrl: string, slug: string) {
 
   const file = await readFile(filePath);
   const extension = path.extname(imageUrl) || ".jpg";
-  const blob = await put(`services/${slug}${extension}`, file, {
+  const blob = await put(`${folder}/${slug}${extension}`, file, {
     access: "public",
     addRandomSuffix: false,
     allowOverwrite: true,

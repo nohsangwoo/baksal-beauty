@@ -1,3 +1,4 @@
+import { adminUserSeeds, blogPostSeeds, inquirySeeds } from "@/data/admin-seed";
 import { dbQuery, hasDatabaseConnection, toPostgresArray } from "@/lib/db";
 
 export type AdminResource = "users" | "blog" | "inquire";
@@ -20,60 +21,54 @@ type ResourceConfig = {
   fallback: AdminRecord[];
 };
 
+const userFallback: AdminRecord[] = adminUserSeeds.map((user) => ({
+  id: user.email,
+  title: user.name,
+  subtitle: user.email,
+  status: user.status,
+  meta: user.role,
+}));
+
+const blogFallback: AdminRecord[] = blogPostSeeds.map((post) => ({
+  id: post.slug,
+  title: post.title,
+  subtitle: post.excerpt,
+  status: post.status,
+  meta: post.category,
+  imageUrl: post.imageUrl,
+  tags: post.tags,
+}));
+
+const inquiryFallback: AdminRecord[] = inquirySeeds.map((inquiry) => ({
+  id: inquiry.seedKey,
+  title: inquiry.name,
+  subtitle: inquiry.message,
+  status: inquiry.status,
+  meta: inquiry.interest,
+  tags: [inquiry.preferredChannel],
+}));
+
 const resourceConfigs: Record<AdminResource, ResourceConfig> = {
   users: {
     table: "admin_users",
     select:
       "id::text, name AS title, email AS subtitle, status, role AS meta, NULL::text AS image_url, ARRAY[]::text[] AS tags, created_at::text",
     orderBy: "created_at DESC",
-    fallback: [
-      {
-        id: "owner",
-        title: "노상우",
-        subtitle: "milli@molluhub.com",
-        status: "active",
-        meta: "Owner",
-      },
-      {
-        id: "manager",
-        title: "Clinic Manager",
-        subtitle: "manager@bsclinic.local",
-        status: "pending",
-        meta: "Manager",
-      },
-    ],
+    fallback: userFallback,
   },
   blog: {
     table: "blog_posts",
     select:
       "id::text, title, excerpt AS subtitle, status, category AS meta, image_url, tags, created_at::text",
     orderBy: "created_at DESC",
-    fallback: [
-      {
-        id: "blog-1",
-        title: "눈성형 상담 전 확인할 구조적 포인트",
-        subtitle: "라인보다 먼저 봐야 할 눈뜨는 힘과 좌우 균형",
-        status: "draft",
-        meta: "Aesthetic Medicine",
-        tags: ["eye", "guide"],
-      },
-    ],
+    fallback: blogFallback,
   },
   inquire: {
     table: "inquiries",
     select:
       "id::text, name AS title, message AS subtitle, status, interest AS meta, NULL::text AS image_url, ARRAY[preferred_channel]::text[] AS tags, created_at::text",
     orderBy: "created_at DESC",
-    fallback: [
-      {
-        id: "inquiry-1",
-        title: "비회원 상담 신청",
-        subtitle: "눈성형 상담 가능 일정 문의",
-        status: "new",
-        meta: "눈성형",
-        tags: ["KakaoTalk"],
-      },
-    ],
+    fallback: inquiryFallback,
   },
 };
 
@@ -282,8 +277,9 @@ function normalizeTags(value: unknown) {
 
 function slugify(value: string) {
   return value
+    .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9가-힣]+/g, "-")
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 }

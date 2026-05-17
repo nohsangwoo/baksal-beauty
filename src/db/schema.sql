@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS blog_posts (
 
 CREATE TABLE IF NOT EXISTS inquiries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  seed_key text,
   name text NOT NULL,
   phone text NOT NULL DEFAULT '',
   email text NOT NULL DEFAULT '',
@@ -70,6 +71,9 @@ CREATE TABLE IF NOT EXISTS inquiries (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE inquiries
+  ADD COLUMN IF NOT EXISTS seed_key text;
+
 CREATE INDEX IF NOT EXISTS service_items_status_sort_idx
   ON service_items (status, featured DESC, sort_order ASC);
 
@@ -81,3 +85,7 @@ CREATE INDEX IF NOT EXISTS blog_posts_status_created_idx
 
 CREATE INDEX IF NOT EXISTS inquiries_status_created_idx
   ON inquiries (status, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS inquiries_seed_key_unique_idx
+  ON inquiries (seed_key)
+  WHERE seed_key IS NOT NULL AND seed_key <> '';
