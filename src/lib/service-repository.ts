@@ -124,6 +124,54 @@ export async function getAdminServices(locale: Locale) {
   return listServices(locale, "all");
 }
 
+export async function getServiceBySlug(locale: Locale, slug: string) {
+  if (!hasDatabaseConnection()) {
+    return getFallbackServices(locale, "all").find((item) => item.slug === slug) ?? null;
+  }
+
+  try {
+    const result = await dbQuery<ServiceRow>(
+      `
+        SELECT
+          si.id::text,
+          si.slug,
+          si.category,
+          si.tags,
+          si.image_url,
+          COALESCE(st.image_alt, st_ko.image_alt, '') AS image_alt,
+          si.featured,
+          si.sort_order,
+          si.status,
+          COALESCE(st.title, st_ko.title, '') AS title,
+          COALESCE(st.subtitle, st_ko.subtitle, '') AS subtitle,
+          COALESCE(st.summary, st_ko.summary, '') AS summary,
+          COALESCE(st.description, st_ko.description, '') AS description,
+          COALESCE(st.highlights, st_ko.highlights, ARRAY[]::text[]) AS highlights,
+          COALESCE(st.recommended_for, st_ko.recommended_for, ARRAY[]::text[]) AS recommended_for,
+          COALESCE(st.process_steps, st_ko.process_steps, ARRAY[]::text[]) AS process_steps,
+          COALESCE(st.recovery, st_ko.recovery, '') AS recovery,
+          COALESCE(st.duration, st_ko.duration, '') AS duration,
+          COALESCE(st.price_note, st_ko.price_note, '') AS price_note,
+          si.updated_at::text
+        FROM service_items si
+        LEFT JOIN service_item_translations st
+          ON st.service_item_id = si.id AND st.locale = $1
+        LEFT JOIN service_item_translations st_ko
+          ON st_ko.service_item_id = si.id AND st_ko.locale = 'ko'
+        WHERE si.status <> 'archived'
+          AND si.slug = $2
+        LIMIT 1
+      `,
+      [locale, slug],
+    );
+
+    return result.rows[0] ? mapServiceRow(result.rows[0]) : null;
+  } catch (error) {
+    console.error(`Failed to get service ${slug} from database`, error);
+    return getFallbackServices(locale, "all").find((item) => item.slug === slug) ?? null;
+  }
+}
+
 export async function createService(input: ServiceMutationInput) {
   assertDatabase();
   const locale = input.locale ?? "ko";

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Check, Clock, Loader2, Sparkles } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { useState } from "react";
 import {
   serviceCategoryIds,
@@ -81,74 +81,15 @@ export function ServiceBrowser({ locale, copy }: ServiceBrowserProps) {
         ) : items.length === 0 ? (
           <div className="glass-panel mt-10 p-10 text-center text-[#d9d0c9]">{copy.details.empty}</div>
         ) : (
-          <div className="mt-10 grid gap-6 lg:grid-cols-2">
+          <div className="mt-10 grid gap-5 overflow-visible md:grid-cols-2 xl:grid-cols-4">
             {items.map((item, index) => (
-              <article
+              <ServiceCatalogCard
                 key={item.id}
-                data-magnetic=""
-                data-magnetic-strength="4"
-                className="glass-panel group grid overflow-hidden lg:grid-cols-[0.78fr_1fr]"
-                style={{ "--reveal-delay": `${Math.min(index * 80, 360)}ms` } as CSSProperties}
-              >
-                <div className="relative min-h-72 overflow-hidden">
-                  <Image
-                    src={item.imageUrl}
-                    alt={item.imageAlt}
-                    fill
-                    sizes="(min-width: 1024px) 420px, 100vw"
-                    className="object-cover transition duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/64 via-transparent to-transparent" />
-                  <div className="absolute left-5 top-5 flex flex-wrap gap-2">
-                    {item.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full border border-white/18 bg-black/38 px-3 py-1 text-[0.68rem] font-black uppercase text-white backdrop-blur"
-                      >
-                        {copy.tabs[tag]}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex min-h-full flex-col p-6 md:p-8">
-                  <div>
-                    <p className="eyebrow text-[#dec47b]">{item.subtitle}</p>
-                    <h3 className="font-display mt-3 text-4xl leading-tight">{item.title}</h3>
-                    <p className="mt-5 leading-8 text-[#d9d0c9]">{item.summary}</p>
-                  </div>
-
-                  <div className="mt-6 grid gap-3">
-                    {item.highlights.map((highlight) => (
-                      <p key={highlight} className="flex items-center gap-3 text-sm text-white/82">
-                        <Check size={15} className="text-[#dec47b]" />
-                        {highlight}
-                      </p>
-                    ))}
-                  </div>
-
-                  <div className="mt-7 grid gap-4 border-t border-white/10 pt-6 sm:grid-cols-2">
-                    <InfoBlock icon={<Sparkles size={16} />} label={copy.details.recovery} value={item.recovery} />
-                    <InfoBlock icon={<Clock size={16} />} label={copy.details.duration} value={item.duration} />
-                  </div>
-
-                  <div className="mt-6 rounded-md border border-white/10 bg-white/[0.03] p-4 text-sm leading-7 text-[#d9d0c9]">
-                    <span className="font-black text-[#dec47b]">{copy.details.price}</span>
-                    <br />
-                    {item.priceNote}
-                  </div>
-
-                  <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                    <Link className="button-primary" href={`/${locale}/inquire?service=${item.slug}`}>
-                      {copy.details.inquiry}
-                      <ArrowRight size={15} />
-                    </Link>
-                    <Link className="button-outline" href={`/${locale}/service#${item.slug}`}>
-                      View Details
-                    </Link>
-                  </div>
-                </div>
-              </article>
+                item={item}
+                index={index}
+                locale={locale}
+                copy={copy}
+              />
             ))}
           </div>
         )}
@@ -157,22 +98,119 @@ export function ServiceBrowser({ locale, copy }: ServiceBrowserProps) {
   );
 }
 
-function InfoBlock({
-  icon,
-  label,
-  value,
+function ServiceCatalogCard({
+  item,
+  index,
+  locale,
+  copy,
 }: {
-  icon: ReactNode;
-  label: string;
-  value: string;
+  item: ServiceItem;
+  index: number;
+  locale: Locale;
+  copy: ServicePageCopy;
+}) {
+  const detailHref = `/${locale}/service/${item.slug}`;
+  const flyoutSide = index % 4 >= 2 ? "xl:right-[calc(100%+0.75rem)]" : "xl:left-[calc(100%+0.75rem)]";
+
+  return (
+    <article
+      id={item.slug}
+      data-magnetic=""
+      data-magnetic-strength="3"
+      className="glass-panel group relative flex min-h-[23rem] flex-col overflow-visible p-3 transition duration-300 hover:border-[#dec47b]/35"
+      style={{ "--reveal-delay": `${Math.min(index * 70, 280)}ms` } as CSSProperties}
+    >
+      <Link className="absolute inset-0 z-10 rounded-lg" href={detailHref} aria-label={`${item.title} details`} />
+
+      <div className="relative aspect-[4/3] overflow-hidden rounded-md border border-white/10 bg-[#0b0909]">
+        <Image
+          src={item.imageUrl}
+          alt={item.imageAlt}
+          fill
+          sizes="(min-width: 1280px) 280px, (min-width: 768px) 50vw, 100vw"
+          className="object-contain transition duration-700 group-hover:scale-[1.025]"
+        />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/48 to-transparent" />
+        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+          {item.tags.slice(0, 2).map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full border border-white/18 bg-black/45 px-3 py-1 text-[0.66rem] font-black uppercase text-white backdrop-blur"
+            >
+              {copy.tabs[tag]}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col p-2 pt-4">
+        <p className="line-clamp-1 text-[0.72rem] font-black text-[#dec47b]">{item.subtitle}</p>
+        <h3 className="font-display mt-2 line-clamp-2 min-h-[4.1rem] text-[2rem] leading-[1.03]">
+          {item.title}
+        </h3>
+        <p className="mt-3 line-clamp-2 min-h-12 text-sm leading-6 text-[#d9d0c9]">{item.summary}</p>
+
+        <div className="relative z-20 mt-auto grid grid-cols-[1fr_2.75rem] gap-2 pt-5">
+          <Link
+            className="button-primary !h-10 min-w-0 whitespace-nowrap px-3 text-[0.72rem]"
+            href={`/${locale}/inquire?service=${item.slug}`}
+          >
+            {copy.details.inquiry}
+          </Link>
+          <Link
+            className="button-outline aspect-square !h-10 px-0"
+            href={detailHref}
+            aria-label={`${item.title} details`}
+            title="View details"
+          >
+            <ArrowRight size={15} />
+          </Link>
+        </div>
+      </div>
+
+      <HoverDetail item={item} copy={copy} sideClass={flyoutSide} />
+    </article>
+  );
+}
+
+function HoverDetail({
+  item,
+  copy,
+  sideClass,
+}: {
+  item: ServiceItem;
+  copy: ServicePageCopy;
+  sideClass: string;
 }) {
   return (
-    <div className="rounded-md border border-white/10 bg-black/16 p-4">
-      <p className="flex items-center gap-2 text-xs font-black uppercase text-[#dec47b]">
-        {icon}
-        {label}
+    <aside
+      className={`pointer-events-none absolute top-0 z-40 hidden w-80 rounded-md border border-[#dec47b]/25 bg-[#0f0b0d]/95 p-5 opacity-0 shadow-2xl shadow-black/45 backdrop-blur-xl transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 xl:block ${sideClass}`}
+    >
+      <p className="eyebrow text-[#dec47b]">{copy.details.process}</p>
+      <p className="mt-3 text-sm leading-7 text-[#d9d0c9]">{item.description}</p>
+      <div className="mt-5 grid gap-2">
+        {item.highlights.slice(0, 3).map((highlight) => (
+          <p key={highlight} className="flex items-center gap-2 text-sm font-bold text-white/82">
+            <Check size={14} className="shrink-0 text-[#dec47b]" />
+            {highlight}
+          </p>
+        ))}
+      </div>
+      <div className="mt-5 grid gap-3 border-y border-white/10 py-4 text-sm">
+        <p className="flex gap-2 leading-6 text-white/72">
+          <Sparkles size={15} className="mt-1 shrink-0 text-[#dec47b]" />
+          <span>{item.recovery}</span>
+        </p>
+        <p className="flex gap-2 leading-6 text-white/72">
+          <Clock size={15} className="mt-1 shrink-0 text-[#dec47b]" />
+          <span>{item.duration}</span>
+        </p>
+      </div>
+      <p className="mt-4 text-xs font-bold leading-6 text-white/58">
+        <span className="text-[#dec47b]">{copy.details.price}</span>
+        {" / "}
+        {item.priceNote}
       </p>
-      <p className="mt-3 text-sm leading-7 text-white/78">{value}</p>
-    </div>
+    </aside>
   );
 }
