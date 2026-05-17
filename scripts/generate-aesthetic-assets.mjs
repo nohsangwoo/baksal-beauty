@@ -88,6 +88,24 @@ const assets = [
       "Vertical treatment card photo, close-up skin recovery facial treatment with hydrating serum and gloved clinician hand, clean spa clinic, premium skincare medical aesthetic.",
   },
   {
+    file: "service-eye-design.jpg",
+    size: "1536x1024",
+    prompt:
+      "Horizontal service page image, adult Korean woman in a refined eye surgery consultation, doctor gently indicating eyelid line with a clean clinical tool, elegant ivory clinic, calm trustworthy mood.",
+  },
+  {
+    file: "service-lifting.jpg",
+    size: "1536x1024",
+    prompt:
+      "Horizontal service page image, adult Korean woman receiving a facial lifting consultation, subtle jawline and cheek vector guide light, premium aesthetic clinic, natural refined expression.",
+  },
+  {
+    file: "service-petit.jpg",
+    size: "1536x1024",
+    prompt:
+      "Horizontal service page image, adult Korean woman during conservative petit facial balancing consultation, gloved clinician hand near cheek with small cosmetic syringe out of focus, calm medical elegance.",
+  },
+  {
     file: "before-face.jpg",
     size: "1024x1024",
     prompt:
