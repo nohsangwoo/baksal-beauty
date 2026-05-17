@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, Languages, Phone } from "lucide-react";
+import { ANNOUNCEMENT_VISIBILITY_EVENT } from "@/components/home-announcement";
 import {
   getOtherLocales,
   isLocale,
@@ -16,6 +17,7 @@ import type { HomeDictionary } from "@/i18n/dictionaries";
 type SiteHeaderProps = {
   t: HomeDictionary;
   locale: Locale;
+  hasAnnouncementOffset?: boolean;
 };
 
 type LanguageLinksProps = {
@@ -33,10 +35,11 @@ type ScrollRestoreSnapshot = {
 const SCROLL_RESTORE_KEY = "baksal-beauty:locale-scroll";
 const pageRouteSegments = ["about", "service", "blog", "inquire"] as const;
 
-export function SiteHeader({ t, locale }: SiteHeaderProps) {
+export function SiteHeader({ t, locale, hasAnnouncementOffset = false }: SiteHeaderProps) {
   const [compact, setCompact] = useState(false);
   const [transitionsEnabled, setTransitionsEnabled] = useState(false);
   const [homeMenuOpen, setHomeMenuOpen] = useState(false);
+  const [announcementVisible, setAnnouncementVisible] = useState(hasAnnouncementOffset);
   const homeMenuRef = useRef<HTMLDivElement>(null);
   const homeMenuCloseTimerRef = useRef<number | null>(null);
   const transitionFrameRef = useRef<number | null>(null);
@@ -89,6 +92,23 @@ export function SiteHeader({ t, locale }: SiteHeaderProps) {
 
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!hasAnnouncementOffset) {
+      return;
+    }
+
+    const handleAnnouncementVisibility = (event: Event) => {
+      const { visible } = (event as CustomEvent<{ visible?: boolean }>).detail ?? {};
+      setAnnouncementVisible(Boolean(visible));
+    };
+
+    window.addEventListener(ANNOUNCEMENT_VISIBILITY_EVENT, handleAnnouncementVisibility);
+
+    return () => {
+      window.removeEventListener(ANNOUNCEMENT_VISIBILITY_EVENT, handleAnnouncementVisibility);
+    };
+  }, [hasAnnouncementOffset]);
 
   useEffect(() => {
     const closeOnOutsideClick = (event: PointerEvent) => {
@@ -149,13 +169,14 @@ export function SiteHeader({ t, locale }: SiteHeaderProps) {
       homeMenuCloseTimerRef.current = null;
     }, 120);
   };
+  const shouldOffsetForAnnouncement = hasAnnouncementOffset && announcementVisible && !compact;
 
   return (
     <header
       className={`fixed left-0 right-0 z-50 overflow-visible ${headerTransitionClass} ${
         compact
           ? "top-0 bg-[#0d0b0c]/90 shadow-[0_18px_50px_rgba(0,0,0,0.34)] backdrop-blur-xl"
-          : "top-8 bg-transparent shadow-none backdrop-blur-0"
+          : `${shouldOffsetForAnnouncement ? "top-8" : "top-0"} bg-transparent shadow-none backdrop-blur-0`
       }`}
     >
       <div

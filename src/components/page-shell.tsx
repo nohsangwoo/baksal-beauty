@@ -34,8 +34,18 @@ export function PageShell({
       <SiteHeader key={locale} t={t} locale={locale} />
       <PageMotion />
       <FloatingContactActions />
-      <section data-reveal-section="" className="relative overflow-hidden border-b border-white/10 pb-20 pt-36 md:pb-28 md:pt-44">
-        <Image src={image} alt={imageAlt} fill priority sizes="100vw" className="object-cover" />
+      <section
+        data-reveal-section=""
+        className="relative grid min-h-[62svh] items-center overflow-hidden border-b border-white/10 py-28 pt-36 md:min-h-[72svh] md:py-36 md:pt-40"
+      >
+        <Image
+          src={image}
+          alt={imageAlt}
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
+        />
         <div className="absolute inset-0 bg-black/62" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#170c10]/90 via-[#3b0719]/35 to-black/30" />
         <div className="section-shell relative z-10 max-w-5xl">

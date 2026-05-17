@@ -9,14 +9,17 @@ import {
   MapPin,
   MessageCircle,
   Phone,
-  ShieldCheck,
   Sparkles,
   Star,
 } from "lucide-react";
-import { FloatingContactActions, SocialChannelButtons } from "@/components/contact-actions";
+import { FloatingContactActions } from "@/components/contact-actions";
+import { DoctorTeamPreview } from "@/components/doctor-profile-modal";
+import { HomeAnnouncement } from "@/components/home-announcement";
 import { BeforeAfterSlider, TreatmentPillars } from "@/components/home-interactions";
 import { PageMotion } from "@/components/page-motion";
+import { ContactSection, NewsletterSection } from "@/components/shared-sections";
 import { LanguageLinks, SiteHeader } from "@/components/site-header";
+import { getDoctorTeam } from "@/data/doctor-profiles";
 import { isLocale, locales, type Locale } from "@/i18n/config";
 import { getDictionary, type HomeDictionary } from "@/i18n/dictionaries";
 
@@ -58,7 +61,7 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#1f1715] text-[#fff8ef]">
-      <SiteHeader key={rawLocale} t={t} locale={rawLocale} />
+      <SiteHeader key={rawLocale} t={t} locale={rawLocale} hasAnnouncementOffset />
       <PageMotion />
       <FloatingContactActions />
       <HeroSection t={t} />
@@ -67,13 +70,13 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
       <PopularTreatmentsSection t={t} />
       <ComparisonSection t={t} />
       <InquiryBand t={t} />
-      <DoctorsSection t={t} />
+      <DoctorsSection t={t} locale={rawLocale} />
       <ReviewsSection t={t} />
       <GuideSection t={t} />
       <ConsultationSection t={t} />
       <ShopSection t={t} />
       <BlogSection t={t} />
-      <ContactSection t={t} />
+      <ContactSection t={t} locale={rawLocale} />
       <NewsletterSection t={t} />
       <Footer t={t} locale={rawLocale} />
     </main>
@@ -91,20 +94,24 @@ function HeroSection({ t }: { t: HomeDictionary }) {
 
   return (
     <section data-reveal-section="" className="relative min-h-screen overflow-hidden border-b border-white/10">
-      <Image
-        src="/images/hero.png"
-        alt={t.hero.imageAlt}
-        fill
-        priority
-        sizes="100vw"
-        className="hero-visual object-cover object-center"
-      />
+      <video
+        aria-hidden="true"
+        autoPlay
+        className="hero-visual absolute inset-0 h-full w-full object-cover object-center"
+        disablePictureInPicture
+        loop
+        muted
+        playsInline
+        poster="/images/hero.png"
+        preload="auto"
+      >
+        <source src="/images/hero.webm" type="video/webm" />
+        <source src="/images/hero.mp4" type="video/mp4" />
+      </video>
       <div className="absolute inset-0 bg-black/45" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/58 via-[#3b0719]/20 to-black/20" />
 
-      <div className="relative z-10 border-b border-white/10 bg-[#e7d1c7]/90 py-2 text-center text-[0.72rem] font-bold text-[#211515]">
-        {t.hero.announcement}
-      </div>
+      <HomeAnnouncement message={t.hero.announcement} />
 
       <div className="relative z-10 section-shell grid min-h-[calc(100svh-2.25rem)] items-center pb-32 pt-28 md:pb-36 md:pt-24">
         <div className="max-w-3xl">
@@ -346,7 +353,9 @@ function InquiryBand({ t }: { t: HomeDictionary }) {
   );
 }
 
-function DoctorsSection({ t }: { t: HomeDictionary }) {
+function DoctorsSection({ t, locale }: { t: HomeDictionary; locale: Locale }) {
+  const team = getDoctorTeam(locale);
+
   return (
     <section data-reveal-section="" id="doctors" className="bg-[#241b18] py-24 md:py-32">
       <div className="section-shell">
@@ -358,38 +367,17 @@ function DoctorsSection({ t }: { t: HomeDictionary }) {
           </h2>
           <p className="mt-6 text-lg italic text-[#d9d0c9]">{t.doctors.intro}</p>
         </div>
-        <div className="mt-16 grid gap-6 lg:grid-cols-3">
-          {t.doctors.list.map((doctor) => (
-            <article
-              key={doctor.name}
-              data-magnetic=""
-              data-magnetic-strength="4"
-              className="glass-panel p-6 md:p-8"
-            >
-              <p className="font-display text-3xl text-white">{doctor.name}</p>
-              <p className="mt-2 text-sm font-bold text-[#e38aa0]">{doctor.role}</p>
-              <div className="mx-auto my-10 aspect-square w-52 overflow-hidden rounded-full border border-white/10 bg-white/5">
-                <Image
-                  src={doctor.image}
-                  alt={doctor.name}
-                  width={420}
-                  height={420}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <p className="min-h-14 leading-7 text-[#d9d0c9]">{doctor.summary}</p>
-              <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-6">
-                <a className="text-xs font-black uppercase transition hover:text-[#dec47b]" href="#consult">
-                  {t.common.profileCta}
-                </a>
-                <ShieldCheck className="text-[#dec47b]" size={22} />
-              </div>
-            </article>
-          ))}
-        </div>
+        <DoctorTeamPreview
+          representative={team.representative}
+          doctors={team.otherDoctors}
+          labels={team.labels}
+          featuredLabel={team.representativeBadge}
+          featuredCta={team.labels.openProfile}
+        />
         <div className="mt-12 text-center">
-          <a className="button-primary" href="#consult">
-            {t.doctors.cta}
+          <a className="button-primary" href={`/${locale}/about#medical-team`}>
+            {team.homeTeamCta}
+            <ArrowRight size={16} />
           </a>
         </div>
       </div>
@@ -635,106 +623,6 @@ function BlogSection({ t }: { t: HomeDictionary }) {
             </article>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-function ContactSection({ t }: { t: HomeDictionary }) {
-  const contactRows = [
-    { label: "Representative", value: "노상우" },
-    { label: "Address", value: "인천광역시 연수구 인천타워대로 323, 에이동 20층" },
-    { label: "Phone", value: "010 - 3006 - 9310", href: "tel:01030069310" },
-    { label: "Email", value: "milli@molluhub.com", href: "mailto:milli@molluhub.com" },
-  ];
-
-  return (
-    <section
-      data-reveal-section=""
-      id="contact"
-      className="border-y border-white/10 bg-[#120d0e] py-24 md:py-32"
-    >
-      <div className="section-shell">
-        <div className="mb-12 max-w-3xl">
-          <p className="eyebrow text-[#dec47b]">Contact Us</p>
-          <h2 className="font-display mt-4 text-5xl leading-tight md:text-7xl">
-            Visit, call, or start a private conversation.
-          </h2>
-          <p className="mt-6 leading-8 text-[#d9d0c9]">
-            {t.footer.companyName}의 공식 연락처입니다. 프로젝트 상담과 운영 문의를 같은 채널에서 확인합니다.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[1.45fr_0.8fr]">
-          <div
-            data-magnetic=""
-            data-magnetic-strength="4"
-            className="contact-map-frame relative min-h-[420px] overflow-hidden rounded-lg border border-white/10 md:min-h-[560px]"
-          >
-            <iframe
-              aria-label="LUDGI office map"
-              className="absolute inset-0 h-full w-full grayscale-[0.25] invert-[0.88] saturate-[0.65]"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              src="https://www.openstreetmap.org/export/embed.html?bbox=126.6396%2C37.3901%2C126.6514%2C37.3978&layer=mapnik&marker=37.39395%2C126.6455"
-              title="LUDGI office map"
-            />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#120d0e]/35 via-transparent to-[#120d0e]/10" />
-          </div>
-
-          <aside className="glass-panel flex flex-col justify-between p-6 md:p-8">
-            <div>
-              <span className="flower-mark text-[#dec47b]" aria-hidden="true" />
-              <h3 className="font-display mt-5 text-4xl">BAKSAL BEAUTY Contact</h3>
-              <div className="mt-8 divide-y divide-white/10">
-                {contactRows.map((row) => (
-                  <div key={row.label} className="grid gap-2 py-5">
-                    <p className="eyebrow text-[#d9c1ad]">{row.label}</p>
-                    {row.href ? (
-                      <a className="leading-7 text-white transition hover:text-[#dec47b]" href={row.href}>
-                        {row.value}
-                      </a>
-                    ) : (
-                      <p className="leading-7 text-white">{row.value}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="mt-8 border-t border-white/10 pt-6">
-              <p className="mb-4 text-sm font-bold text-[#b6aaa6]">Connect directly</p>
-              <SocialChannelButtons />
-            </div>
-          </aside>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function NewsletterSection({ t }: { t: HomeDictionary }) {
-  return (
-    <section data-reveal-section="" className="relative overflow-hidden py-24 md:py-32">
-      <Image
-        src="/images/newsletter.jpg"
-        alt={t.newsletter.imageAlt}
-        fill
-        sizes="100vw"
-        className="object-cover"
-      />
-      <div className="absolute inset-0 bg-black/55" />
-      <div className="section-shell relative z-10 text-center">
-        <span className="flower-mark mx-auto text-[#dec47b]" aria-hidden="true" />
-        <h2 className="font-display mx-auto mt-7 max-w-4xl text-5xl leading-tight md:text-7xl">
-          {t.newsletter.title}
-        </h2>
-        <p className="mx-auto mt-5 max-w-2xl leading-8 text-[#d9d0c9]">{t.newsletter.body}</p>
-        <form className="mx-auto mt-9 flex max-w-xl flex-col gap-3 sm:flex-row">
-          <input className="form-field flex-1" name="email" placeholder={t.newsletter.placeholder} />
-          <button className="button-primary sm:w-44" type="button">
-            {t.newsletter.submit}
-          </button>
-        </form>
       </div>
     </section>
   );

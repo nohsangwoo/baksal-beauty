@@ -36,8 +36,11 @@ export default function RootLayout({
     <html
       lang="ko"
       className={`${sans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
     >
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

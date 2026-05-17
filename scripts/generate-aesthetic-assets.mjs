@@ -118,6 +118,12 @@ const assets = [
       "Professional portrait of a Korean female dermatologist aesthetic specialist in a white coat, late 30s, holding a small skincare vial, clean premium clinic background.",
   },
   {
+    file: "doctor-balance.jpg",
+    size: "1024x1024",
+    prompt:
+      "Professional portrait of a Korean female plastic surgeon in a white coat, early 40s, eye and nose facial balance specialist, calm confident expression, premium clinic consultation room background, medically trustworthy editorial portrait.",
+  },
+  {
     file: "consultation-face.jpg",
     size: "1536x1024",
     prompt:
