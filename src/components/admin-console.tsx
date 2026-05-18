@@ -113,6 +113,19 @@ const emptyRecord: AdminRecord = {
   tags: [],
 };
 
+function getEmptyRecord(tab: Exclude<AdminTab, "dashboard" | "services">): AdminRecord {
+  if (tab === "users") {
+    return {
+      ...emptyRecord,
+      status: "active",
+      meta: "patient",
+      tags: ["manual"],
+    };
+  }
+
+  return emptyRecord;
+}
+
 export function AdminConsole({ locale }: { locale: Locale }) {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [serviceLocale, setServiceLocale] = useState<Locale>(locale);
@@ -185,6 +198,7 @@ export function AdminConsole({ locale }: { locale: Locale }) {
               />
             ) : (
               <GenericCrudPanel
+                key={activeTab}
                 tab={activeTab}
                 items={getQuery(activeTab, userQuery, blogQuery, inquireQuery).data?.items ?? []}
                 source={getQuery(activeTab, userQuery, blogQuery, inquireQuery).data?.source}
@@ -709,7 +723,7 @@ function GenericCrudPanel({
   loading: boolean;
   onChanged: () => void;
 }) {
-  const [editing, setEditing] = useState<AdminRecord>(emptyRecord);
+  const [editing, setEditing] = useState<AdminRecord>(() => getEmptyRecord(tab));
   const [notice, setNotice] = useState("");
   const isMediaResource = tab === "blog";
   const saveMutation = useMutation({
@@ -720,7 +734,7 @@ function GenericCrudPanel({
     },
     onSuccess: () => {
       setNotice("저장되었습니다.");
-      setEditing(emptyRecord);
+      setEditing(getEmptyRecord(tab));
       onChanged();
     },
     onError: (error) => setNotice(error instanceof Error ? error.message : "저장에 실패했습니다."),
@@ -741,7 +755,7 @@ function GenericCrudPanel({
       loading={loading}
       notice={notice}
       action={
-        <button className="button-outline" onClick={() => setEditing(emptyRecord)} type="button">
+        <button className="button-outline" onClick={() => setEditing(getEmptyRecord(tab))} type="button">
           New Record
         </button>
       }
@@ -781,7 +795,7 @@ function GenericCrudPanel({
             <Field label={tab === "users" ? "Role" : "Category / Interest"} value={editing.meta} onChange={(value) => setEditing({ ...editing, meta: value })} />
             <Field label="Status" value={editing.status} onChange={(value) => setEditing({ ...editing, status: value })} />
             <Field
-              label="Tags / Channel"
+              label={tab === "users" ? "Auth Provider" : "Tags / Channel"}
               value={(editing.tags ?? []).join(", ")}
               onChange={(value) => setEditing({ ...editing, tags: value.split(",").map((item) => item.trim()).filter(Boolean) })}
             />

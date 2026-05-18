@@ -40,12 +40,17 @@ CREATE TABLE IF NOT EXISTS service_item_translations (
   PRIMARY KEY (service_item_id, locale)
 );
 
-CREATE TABLE IF NOT EXISTS admin_users (
+CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
+  firebase_uid text UNIQUE,
+  name text NOT NULL DEFAULT '',
   email text NOT NULL UNIQUE,
-  role text NOT NULL DEFAULT 'Editor',
+  phone text NOT NULL DEFAULT '',
+  photo_url text NOT NULL DEFAULT '',
+  role text NOT NULL DEFAULT 'patient',
   status text NOT NULL DEFAULT 'active',
+  auth_provider text NOT NULL DEFAULT 'firebase',
+  last_login_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -94,6 +99,40 @@ ALTER TABLE service_item_translations
   ADD COLUMN IF NOT EXISTS youtube_videos jsonb NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS detail_cta jsonb NOT NULL DEFAULT '{}'::jsonb;
 
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS firebase_uid text,
+  ADD COLUMN IF NOT EXISTS phone text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS photo_url text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS auth_provider text NOT NULL DEFAULT 'firebase',
+  ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx
+  ON users (email);
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_firebase_uid_unique_idx
+  ON users (firebase_uid)
+  WHERE firebase_uid IS NOT NULL AND firebase_uid <> '';
+
+DO $$
+BEGIN
+  IF to_regclass('public.admin_users') IS NOT NULL THEN
+    EXECUTE '
+      INSERT INTO users (name, email, role, status, auth_provider, created_at, updated_at)
+      SELECT name, email, role, status, ''manual'', created_at, updated_at
+      FROM admin_users
+      ON CONFLICT (email) DO UPDATE
+      SET
+        name = EXCLUDED.name,
+        role = EXCLUDED.role,
+        status = EXCLUDED.status,
+        auth_provider = COALESCE(NULLIF(users.auth_provider, ''''), ''manual''),
+        updated_at = now()
+    ';
+
+    DROP TABLE IF EXISTS admin_users;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS service_items_status_sort_idx
   ON service_items (status, featured DESC, sort_order ASC);
 
@@ -105,6 +144,12 @@ CREATE INDEX IF NOT EXISTS blog_posts_status_created_idx
 
 CREATE INDEX IF NOT EXISTS inquiries_status_created_idx
   ON inquiries (status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS users_role_status_idx
+  ON users (role, status);
+
+CREATE INDEX IF NOT EXISTS users_created_at_idx
+  ON users (created_at DESC);
 
 CREATE UNIQUE INDEX IF NOT EXISTS inquiries_seed_key_unique_idx
   ON inquiries (seed_key)

@@ -1,6 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { adminUserSeeds, blogPostSeeds, inquirySeeds } from "@/data/admin-seed";
-import { adminUsers, blogPosts, inquiries } from "@/db/schema";
+import { blogPosts, inquiries, users } from "@/db/schema";
 import { getDb, hasDatabaseConnection } from "@/lib/db";
 
 export type AdminResource = "users" | "blog" | "inquire";
@@ -65,19 +65,20 @@ export async function listAdminRecords(resource: AdminResource) {
     if (resource === "users") {
       const rows = await getDb()
         .select({
-          id: adminUsers.id,
-          title: adminUsers.name,
-          subtitle: adminUsers.email,
-          status: adminUsers.status,
-          meta: adminUsers.role,
-          createdAt: adminUsers.createdAt,
+          id: users.id,
+          title: users.name,
+          subtitle: users.email,
+          status: users.status,
+          meta: users.role,
+          tags: sql<string[]>`ARRAY[${users.authProvider}]::text[]`,
+          createdAt: users.createdAt,
         })
-        .from(adminUsers)
-        .orderBy(desc(adminUsers.createdAt));
+        .from(users)
+        .orderBy(desc(users.createdAt));
 
       return {
         source: "database" as const,
-        items: rows.map((row) => ({ ...row, tags: [] })),
+        items: rows,
       };
     }
 
@@ -134,14 +135,15 @@ export async function createAdminRecord(resource: AdminResource, body: Record<st
 
   if (resource === "users") {
     const [created] = await db
-      .insert(adminUsers)
+      .insert(users)
       .values({
         name: String(body.title ?? ""),
-        email: String(body.subtitle ?? ""),
+        email: String(body.subtitle ?? "").trim().toLowerCase(),
         role: String(body.meta ?? "Editor"),
         status: String(body.status ?? "active"),
+        authProvider: normalizeTags(body.tags)[0] ?? "manual",
       })
-      .returning({ id: adminUsers.id });
+      .returning({ id: users.id });
 
     return created?.id;
   }
@@ -189,15 +191,16 @@ export async function updateAdminRecord(
 
   if (resource === "users") {
     await db
-      .update(adminUsers)
+      .update(users)
       .set({
         name: String(body.title ?? ""),
-        email: String(body.subtitle ?? ""),
+        email: String(body.subtitle ?? "").trim().toLowerCase(),
         role: String(body.meta ?? "Editor"),
         status: String(body.status ?? "active"),
+        authProvider: normalizeTags(body.tags)[0] ?? "manual",
         updatedAt: sql`now()`,
       })
-      .where(eq(adminUsers.id, id));
+      .where(eq(users.id, id));
     return;
   }
 
@@ -235,7 +238,7 @@ export async function deleteAdminRecord(resource: AdminResource, id: string) {
   const db = getDb();
 
   if (resource === "users") {
-    await db.delete(adminUsers).where(eq(adminUsers.id, id));
+    await db.delete(users).where(eq(users.id, id));
     return;
   }
 

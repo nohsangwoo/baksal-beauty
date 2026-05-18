@@ -95,7 +95,7 @@ const copyByLocale: Record<Locale, AuthCopy> = {
 
 export function AuthMenu({ locale }: { locale: Locale }) {
   const copy = copyByLocale[locale];
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, redirectError, clearRedirectError } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -123,6 +123,9 @@ export function AuthMenu({ locale }: { locale: Locale }) {
     };
   }, []);
 
+  const dialogOpen = modalOpen || Boolean(redirectError);
+
+
   if (loading) {
     return (
       <button className="button-outline h-10 px-3 text-[0.68rem]" disabled type="button">
@@ -139,7 +142,17 @@ export function AuthMenu({ locale }: { locale: Locale }) {
           <LogIn size={15} />
           <span className="hidden sm:inline">{copy.login}</span>
         </button>
-        {modalOpen ? <AuthDialog copy={copy} onClose={() => setModalOpen(false)} /> : null}
+        {dialogOpen ? (
+          <AuthDialog
+            copy={copy}
+            externalError={redirectError}
+            onClearExternalError={clearRedirectError}
+            onClose={() => {
+              clearRedirectError();
+              setModalOpen(false);
+            }}
+          />
+        ) : null}
       </>
     );
   }
@@ -200,7 +213,17 @@ export function AuthMenu({ locale }: { locale: Locale }) {
   );
 }
 
-function AuthDialog({ copy, onClose }: { copy: AuthCopy; onClose: () => void }) {
+function AuthDialog({
+  copy,
+  externalError,
+  onClearExternalError,
+  onClose,
+}: {
+  copy: AuthCopy;
+  externalError?: unknown;
+  onClearExternalError?: () => void;
+  onClose: () => void;
+}) {
   const { loginWithEmail, loginWithGoogle, registerWithEmail } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [displayName, setDisplayName] = useState("");
@@ -208,6 +231,7 @@ function AuthDialog({ copy, onClose }: { copy: AuthCopy; onClose: () => void }) 
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const activeError = error || (externalError ? getAuthErrorMessage(externalError) : "");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -232,10 +256,10 @@ function AuthDialog({ copy, onClose }: { copy: AuthCopy; onClose: () => void }) 
   async function handleGoogleLogin() {
     setBusy(true);
     setError("");
+    onClearExternalError?.();
 
     try {
       await loginWithGoogle();
-      onClose();
     } catch (caught) {
       setError(getAuthErrorMessage(caught));
     } finally {
@@ -269,6 +293,7 @@ function AuthDialog({ copy, onClose }: { copy: AuthCopy; onClose: () => void }) 
               onClick={() => {
                 setMode(item);
                 setError("");
+                onClearExternalError?.();
               }}
               type="button"
             >
@@ -328,7 +353,11 @@ function AuthDialog({ copy, onClose }: { copy: AuthCopy; onClose: () => void }) 
             />
           </label>
 
-          {error ? <p className="rounded-md border border-[#d62f55]/35 bg-[#d62f55]/10 px-3 py-2 text-xs leading-5 text-[#ffb3c0]">{error}</p> : null}
+          {activeError ? (
+            <p className="rounded-md border border-[#d62f55]/35 bg-[#d62f55]/10 px-3 py-2 text-xs leading-5 text-[#ffb3c0]">
+              {activeError}
+            </p>
+          ) : null}
 
           <button className="button-primary mt-2 w-full" disabled={busy} type="submit">
             {busy ? <Loader2 className="animate-spin" size={15} /> : null}

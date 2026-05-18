@@ -9,7 +9,7 @@ import {
   getServiceDetailContent,
 } from "../src/data/service-detail-defaults";
 import { serviceSeeds } from "../src/data/service-content";
-import { adminUsers, blogPosts, inquiries, serviceItems, serviceItemTranslations } from "../src/db/schema";
+import { blogPosts, inquiries, serviceItems, serviceItemTranslations, users } from "../src/db/schema";
 import type { Locale } from "../src/i18n/config";
 import { closeDatabase, executeSchemaSql, getDb } from "../src/lib/db";
 
@@ -242,19 +242,21 @@ function getRelatedSlugs(slug: string) {
 async function seedAdminUsers() {
   for (const seed of adminUserSeeds) {
     await getDb()
-      .insert(adminUsers)
+      .insert(users)
       .values({
         name: seed.name,
         email: seed.email,
         role: seed.role,
         status: seed.status,
+        authProvider: "manual",
       })
       .onConflictDoUpdate({
-        target: adminUsers.email,
+        target: users.email,
         set: {
           name: seed.name,
           role: seed.role,
           status: seed.status,
+          authProvider: "manual",
           updatedAt: sql`now()`,
         },
       });

@@ -84,15 +84,27 @@ export const serviceItemTranslations = pgTable(
   ],
 );
 
-export const adminUsers = pgTable("admin_users", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  role: text("role").notNull().default("Editor"),
-  status: text("status").notNull().default("active"),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    firebaseUid: text("firebase_uid").unique(),
+    name: text("name").notNull().default(""),
+    email: text("email").notNull().unique(),
+    phone: text("phone").notNull().default(""),
+    photoUrl: text("photo_url").notNull().default(""),
+    role: text("role").notNull().default("patient"),
+    status: text("status").notNull().default("active"),
+    authProvider: text("auth_provider").notNull().default("firebase"),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("users_role_status_idx").on(table.role, table.status),
+    index("users_created_at_idx").on(table.createdAt),
+  ],
+);
 
 export const blogPosts = pgTable(
   "blog_posts",
