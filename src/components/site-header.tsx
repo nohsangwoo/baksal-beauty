@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, Languages, Phone } from "lucide-react";
+import { ChevronDown, Languages } from "lucide-react";
+import { AuthMenu } from "@/components/auth-menu";
 import { ANNOUNCEMENT_VISIBILITY_EVENT } from "@/components/home-announcement";
 import {
   getOtherLocales,
@@ -265,10 +266,7 @@ export function SiteHeader({ t, locale, hasAnnouncementOffset = false }: SiteHea
 
         <div className="flex items-center gap-3">
           <LanguageLinks locale={locale} ariaLabel={t.language.switchLabel} />
-          <Link className="button-outline header-consult" href={`/${locale}#consult`}>
-            <Phone size={15} />
-            {t.common.phoneCta}
-          </Link>
+          <AuthMenu locale={locale} />
         </div>
       </div>
     </header>
