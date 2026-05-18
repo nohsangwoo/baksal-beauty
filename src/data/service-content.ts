@@ -6,6 +6,50 @@ export type ServiceCategoryId = (typeof serviceCategoryIds)[number];
 export type ServiceContentCategory = Exclude<ServiceCategoryId, "all">;
 export type ServiceStatus = "draft" | "published" | "archived";
 
+export type ServiceSurgeryInfo = {
+  surgeryTime: string;
+  anesthesia: string;
+  visits: string;
+  aftercareStart: string;
+  recoveryPeriod: string;
+};
+
+export type ServiceDetailPanel = {
+  eyebrow: string;
+  title: string;
+  body: string;
+  imageUrl: string;
+  imageAlt: string;
+  points: string[];
+};
+
+export type ServiceBeforeAfter = {
+  title: string;
+  body: string;
+  beforeImageUrl: string;
+  beforeAlt: string;
+  afterImageUrl: string;
+  afterAlt: string;
+};
+
+export type ServiceVideoPreview = {
+  title: string;
+  description: string;
+  videoId: string;
+  thumbnailUrl: string;
+};
+
+export type ServiceRichDetailImage = {
+  title: string;
+  imageUrl: string;
+  imageAlt: string;
+};
+
+export type ServiceDetailCta = {
+  title: string;
+  body: string;
+};
+
 export type ServiceItem = {
   id: string;
   slug: string;
@@ -26,6 +70,14 @@ export type ServiceItem = {
   recovery: string;
   duration: string;
   priceNote: string;
+  surgeryInfo?: ServiceSurgeryInfo;
+  detailPanels?: ServiceDetailPanel[];
+  beforeAfter?: ServiceBeforeAfter;
+  richDetailImages?: ServiceRichDetailImage[];
+  youtubeVideos?: ServiceVideoPreview[];
+  detailCta?: ServiceDetailCta;
+  relatedSlugs?: string[];
+  embedding?: number[];
   updatedAt?: string;
 };
 

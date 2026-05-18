@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS service_items (
   featured boolean NOT NULL DEFAULT false,
   sort_order integer NOT NULL DEFAULT 100,
   status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+  related_slugs text[] NOT NULL DEFAULT ARRAY[]::text[],
+  embedding real[] NOT NULL DEFAULT ARRAY[]::real[],
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -27,6 +29,12 @@ CREATE TABLE IF NOT EXISTS service_item_translations (
   duration text NOT NULL DEFAULT '',
   price_note text NOT NULL DEFAULT '',
   image_alt text NOT NULL DEFAULT '',
+  surgery_info jsonb NOT NULL DEFAULT '{}'::jsonb,
+  detail_panels jsonb NOT NULL DEFAULT '[]'::jsonb,
+  before_after jsonb NOT NULL DEFAULT '{}'::jsonb,
+  rich_detail_images jsonb NOT NULL DEFAULT '[]'::jsonb,
+  youtube_videos jsonb NOT NULL DEFAULT '[]'::jsonb,
+  detail_cta jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (service_item_id, locale)
@@ -73,6 +81,18 @@ CREATE TABLE IF NOT EXISTS inquiries (
 
 ALTER TABLE inquiries
   ADD COLUMN IF NOT EXISTS seed_key text;
+
+ALTER TABLE service_items
+  ADD COLUMN IF NOT EXISTS related_slugs text[] NOT NULL DEFAULT ARRAY[]::text[],
+  ADD COLUMN IF NOT EXISTS embedding real[] NOT NULL DEFAULT ARRAY[]::real[];
+
+ALTER TABLE service_item_translations
+  ADD COLUMN IF NOT EXISTS surgery_info jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS detail_panels jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS before_after jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS rich_detail_images jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS youtube_videos jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS detail_cta jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS service_items_status_sort_idx
   ON service_items (status, featured DESC, sort_order ASC);

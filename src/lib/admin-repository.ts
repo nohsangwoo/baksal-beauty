@@ -1,5 +1,7 @@
+import { desc, eq, sql } from "drizzle-orm";
 import { adminUserSeeds, blogPostSeeds, inquirySeeds } from "@/data/admin-seed";
-import { dbQuery, hasDatabaseConnection, toPostgresArray } from "@/lib/db";
+import { adminUsers, blogPosts, inquiries } from "@/db/schema";
+import { getDb, hasDatabaseConnection } from "@/lib/db";
 
 export type AdminResource = "users" | "blog" | "inquire";
 
@@ -12,13 +14,6 @@ export type AdminRecord = {
   imageUrl?: string;
   tags?: string[];
   createdAt?: string;
-};
-
-type ResourceConfig = {
-  table: string;
-  select: string;
-  orderBy: string;
-  fallback: AdminRecord[];
 };
 
 const userFallback: AdminRecord[] = adminUserSeeds.map((user) => ({
@@ -48,28 +43,10 @@ const inquiryFallback: AdminRecord[] = inquirySeeds.map((inquiry) => ({
   tags: [inquiry.preferredChannel],
 }));
 
-const resourceConfigs: Record<AdminResource, ResourceConfig> = {
-  users: {
-    table: "admin_users",
-    select:
-      "id::text, name AS title, email AS subtitle, status, role AS meta, NULL::text AS image_url, ARRAY[]::text[] AS tags, created_at::text",
-    orderBy: "created_at DESC",
-    fallback: userFallback,
-  },
-  blog: {
-    table: "blog_posts",
-    select:
-      "id::text, title, excerpt AS subtitle, status, category AS meta, image_url, tags, created_at::text",
-    orderBy: "created_at DESC",
-    fallback: blogFallback,
-  },
-  inquire: {
-    table: "inquiries",
-    select:
-      "id::text, name AS title, message AS subtitle, status, interest AS meta, NULL::text AS image_url, ARRAY[preferred_channel]::text[] AS tags, created_at::text",
-    orderBy: "created_at DESC",
-    fallback: inquiryFallback,
-  },
+const fallbackByResource: Record<AdminResource, AdminRecord[]> = {
+  users: userFallback,
+  blog: blogFallback,
+  inquire: inquiryFallback,
 };
 
 export function isAdminResource(value: string): value is AdminResource {
@@ -77,113 +54,129 @@ export function isAdminResource(value: string): value is AdminResource {
 }
 
 export async function listAdminRecords(resource: AdminResource) {
-  const config = resourceConfigs[resource];
-
   if (!hasDatabaseConnection()) {
     return {
       source: "fallback" as const,
-      items: config.fallback,
+      items: fallbackByResource[resource],
     };
   }
 
   try {
-    const result = await dbQuery<{
-      id: string;
-      title: string;
-      subtitle: string;
-      status: string;
-      meta: string;
-      image_url: string | null;
-      tags: string[] | null;
-      created_at: string;
-    }>(
-      `
-        SELECT ${config.select}
-        FROM ${config.table}
-        ORDER BY ${config.orderBy}
-      `,
-    );
+    if (resource === "users") {
+      const rows = await getDb()
+        .select({
+          id: adminUsers.id,
+          title: adminUsers.name,
+          subtitle: adminUsers.email,
+          status: adminUsers.status,
+          meta: adminUsers.role,
+          createdAt: adminUsers.createdAt,
+        })
+        .from(adminUsers)
+        .orderBy(desc(adminUsers.createdAt));
+
+      return {
+        source: "database" as const,
+        items: rows.map((row) => ({ ...row, tags: [] })),
+      };
+    }
+
+    if (resource === "blog") {
+      const rows = await getDb()
+        .select({
+          id: blogPosts.id,
+          title: blogPosts.title,
+          subtitle: blogPosts.excerpt,
+          status: blogPosts.status,
+          meta: blogPosts.category,
+          imageUrl: blogPosts.imageUrl,
+          tags: blogPosts.tags,
+          createdAt: blogPosts.createdAt,
+        })
+        .from(blogPosts)
+        .orderBy(desc(blogPosts.createdAt));
+
+      return {
+        source: "database" as const,
+        items: rows,
+      };
+    }
+
+    const rows = await getDb()
+      .select({
+        id: inquiries.id,
+        title: inquiries.name,
+        subtitle: inquiries.message,
+        status: inquiries.status,
+        meta: inquiries.interest,
+        tags: sql<string[]>`ARRAY[${inquiries.preferredChannel}]::text[]`,
+        createdAt: inquiries.createdAt,
+      })
+      .from(inquiries)
+      .orderBy(desc(inquiries.createdAt));
 
     return {
       source: "database" as const,
-      items: result.rows.map((row) => ({
-        id: row.id,
-        title: row.title,
-        subtitle: row.subtitle,
-        status: row.status,
-        meta: row.meta,
-        imageUrl: row.image_url ?? undefined,
-        tags: row.tags ?? [],
-        createdAt: row.created_at,
-      })),
+      items: rows,
     };
   } catch (error) {
     console.error(`Failed to list ${resource}`, error);
     return {
       source: "fallback" as const,
-      items: config.fallback,
+      items: fallbackByResource[resource],
     };
   }
 }
 
 export async function createAdminRecord(resource: AdminResource, body: Record<string, unknown>) {
   assertDatabase();
+  const db = getDb();
 
   if (resource === "users") {
-    const result = await dbQuery<{ id: string }>(
-      `
-        INSERT INTO admin_users (name, email, role, status)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id::text
-      `,
-      [
-        String(body.title ?? ""),
-        String(body.subtitle ?? ""),
-        String(body.meta ?? "Editor"),
-        String(body.status ?? "active"),
-      ],
-    );
-    return result.rows[0]?.id;
+    const [created] = await db
+      .insert(adminUsers)
+      .values({
+        name: String(body.title ?? ""),
+        email: String(body.subtitle ?? ""),
+        role: String(body.meta ?? "Editor"),
+        status: String(body.status ?? "active"),
+      })
+      .returning({ id: adminUsers.id });
+
+    return created?.id;
   }
 
   if (resource === "blog") {
-    const result = await dbQuery<{ id: string }>(
-      `
-        INSERT INTO blog_posts (title, slug, excerpt, category, status, image_url, tags)
-        VALUES ($1, $2, $3, $4, $5, $6, $7::text[])
-        RETURNING id::text
-      `,
-      [
-        String(body.title ?? ""),
-        String(body.slug ?? slugify(String(body.title ?? "blog-post"))),
-        String(body.subtitle ?? ""),
-        String(body.meta ?? "Aesthetic Medicine"),
-        String(body.status ?? "draft"),
-        String(body.imageUrl ?? ""),
-        toPostgresArray(normalizeTags(body.tags)),
-      ],
-    );
-    return result.rows[0]?.id;
+    const [created] = await db
+      .insert(blogPosts)
+      .values({
+        title: String(body.title ?? ""),
+        slug: String(body.slug ?? slugify(String(body.title ?? "blog-post"))),
+        excerpt: String(body.subtitle ?? ""),
+        category: String(body.meta ?? "Aesthetic Medicine"),
+        status: String(body.status ?? "draft"),
+        imageUrl: String(body.imageUrl ?? ""),
+        tags: normalizeTags(body.tags),
+      })
+      .returning({ id: blogPosts.id });
+
+    return created?.id;
   }
 
-  const result = await dbQuery<{ id: string }>(
-    `
-      INSERT INTO inquiries (name, phone, email, interest, preferred_channel, message, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id::text
-    `,
-    [
-      String(body.title ?? ""),
-      String(body.phone ?? ""),
-      String(body.email ?? ""),
-      String(body.meta ?? ""),
-      normalizeTags(body.tags)[0] ?? "phone",
-      String(body.subtitle ?? ""),
-      String(body.status ?? "new"),
-    ],
-  );
+  const [created] = await db
+    .insert(inquiries)
+    .values({
+      name: String(body.title ?? ""),
+      phone: String(body.phone ?? ""),
+      email: String(body.email ?? ""),
+      interest: String(body.meta ?? ""),
+      preferredChannel: normalizeTags(body.tags)[0] ?? "phone",
+      message: String(body.subtitle ?? ""),
+      status: String(body.status ?? "new"),
+    })
+    .returning({ id: inquiries.id });
 
-  return result.rows[0]?.id;
+  return created?.id;
 }
 
 export async function updateAdminRecord(
@@ -192,66 +185,66 @@ export async function updateAdminRecord(
   body: Record<string, unknown>,
 ) {
   assertDatabase();
+  const db = getDb();
 
   if (resource === "users") {
-    await dbQuery(
-      `
-        UPDATE admin_users
-        SET name = $2, email = $3, role = $4, status = $5, updated_at = now()
-        WHERE id = $1::uuid
-      `,
-      [
-        id,
-        String(body.title ?? ""),
-        String(body.subtitle ?? ""),
-        String(body.meta ?? "Editor"),
-        String(body.status ?? "active"),
-      ],
-    );
+    await db
+      .update(adminUsers)
+      .set({
+        name: String(body.title ?? ""),
+        email: String(body.subtitle ?? ""),
+        role: String(body.meta ?? "Editor"),
+        status: String(body.status ?? "active"),
+        updatedAt: sql`now()`,
+      })
+      .where(eq(adminUsers.id, id));
     return;
   }
 
   if (resource === "blog") {
-    await dbQuery(
-      `
-        UPDATE blog_posts
-        SET title = $2, excerpt = $3, category = $4, status = $5, image_url = $6, tags = $7::text[], updated_at = now()
-        WHERE id = $1::uuid
-      `,
-      [
-        id,
-        String(body.title ?? ""),
-        String(body.subtitle ?? ""),
-        String(body.meta ?? "Aesthetic Medicine"),
-        String(body.status ?? "draft"),
-        String(body.imageUrl ?? ""),
-        toPostgresArray(normalizeTags(body.tags)),
-      ],
-    );
+    await db
+      .update(blogPosts)
+      .set({
+        title: String(body.title ?? ""),
+        excerpt: String(body.subtitle ?? ""),
+        category: String(body.meta ?? "Aesthetic Medicine"),
+        status: String(body.status ?? "draft"),
+        imageUrl: String(body.imageUrl ?? ""),
+        tags: normalizeTags(body.tags),
+        updatedAt: sql`now()`,
+      })
+      .where(eq(blogPosts.id, id));
     return;
   }
 
-  await dbQuery(
-    `
-      UPDATE inquiries
-      SET name = $2, message = $3, interest = $4, status = $5, preferred_channel = $6, updated_at = now()
-      WHERE id = $1::uuid
-    `,
-    [
-      id,
-      String(body.title ?? ""),
-      String(body.subtitle ?? ""),
-      String(body.meta ?? ""),
-      String(body.status ?? "new"),
-      normalizeTags(body.tags)[0] ?? "phone",
-    ],
-  );
+  await db
+    .update(inquiries)
+    .set({
+      name: String(body.title ?? ""),
+      message: String(body.subtitle ?? ""),
+      interest: String(body.meta ?? ""),
+      status: String(body.status ?? "new"),
+      preferredChannel: normalizeTags(body.tags)[0] ?? "phone",
+      updatedAt: sql`now()`,
+    })
+    .where(eq(inquiries.id, id));
 }
 
 export async function deleteAdminRecord(resource: AdminResource, id: string) {
   assertDatabase();
-  const config = resourceConfigs[resource];
-  await dbQuery(`DELETE FROM ${config.table} WHERE id = $1::uuid`, [id]);
+  const db = getDb();
+
+  if (resource === "users") {
+    await db.delete(adminUsers).where(eq(adminUsers.id, id));
+    return;
+  }
+
+  if (resource === "blog") {
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
+    return;
+  }
+
+  await db.delete(inquiries).where(eq(inquiries.id, id));
 }
 
 function assertDatabase() {

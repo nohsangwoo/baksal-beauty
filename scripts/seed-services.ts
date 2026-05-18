@@ -1,11 +1,17 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { Pool } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
+import { eq, sql } from "drizzle-orm";
 import { adminUserSeeds, blogPostSeeds, inquirySeeds } from "../src/data/admin-seed";
+import {
+  createServiceEmbedding,
+  getServiceDetailContent,
+} from "../src/data/service-detail-defaults";
 import { serviceSeeds } from "../src/data/service-content";
+import { adminUsers, blogPosts, inquiries, serviceItems, serviceItemTranslations } from "../src/db/schema";
 import type { Locale } from "../src/i18n/config";
+import { closeDatabase, executeSchemaSql, getDb } from "../src/lib/db";
 
 const root = process.cwd();
 
@@ -22,215 +28,306 @@ async function main() {
     throw new Error("Missing DATABASE_URL. Connect bsclinic-db, then run npm run db:seed.");
   }
 
-  const pool = new Pool({ connectionString: databaseUrl });
-  const schemaSql = await readFile(path.join(root, "src", "db", "schema.sql"), "utf8");
+  try {
+    const schemaSql = await readFile(path.join(root, "src", "db", "schema.sql"), "utf8");
+    await executeSchemaSql(schemaSql);
 
-  await pool.query(schemaSql);
+    for (const seed of serviceSeeds) {
+      const imageUrl = await uploadSeedAsset(seed.imageUrl, seed.slug);
+      const [service] = await getDb()
+        .insert(serviceItems)
+        .values({
+          slug: seed.slug,
+          category: seed.category,
+          tags: seed.tags,
+          imageUrl,
+          featured: seed.featured,
+          sortOrder: seed.sortOrder,
+          status: seed.status,
+          relatedSlugs: getRelatedSlugs(seed.slug),
+          embedding: createServiceEmbedding(seed.category, seed.tags, seed.slug),
+        })
+        .onConflictDoUpdate({
+          target: serviceItems.slug,
+          set: {
+            category: seed.category,
+            tags: seed.tags,
+            imageUrl,
+            featured: seed.featured,
+            sortOrder: seed.sortOrder,
+            status: seed.status,
+            relatedSlugs: getRelatedSlugs(seed.slug),
+            embedding: createServiceEmbedding(seed.category, seed.tags, seed.slug),
+            updatedAt: sql`now()`,
+          },
+        })
+        .returning({ id: serviceItems.id });
 
-  for (const seed of serviceSeeds) {
-    const imageUrl = await uploadSeedAsset(seed.imageUrl, seed.slug);
-    const serviceResult = await pool.query<{ id: string }>(
-      `
-        INSERT INTO service_items
-          (slug, category, tags, image_url, featured, sort_order, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (slug)
-        DO UPDATE SET
-          category = EXCLUDED.category,
-          tags = EXCLUDED.tags,
-          image_url = EXCLUDED.image_url,
-          featured = EXCLUDED.featured,
-          sort_order = EXCLUDED.sort_order,
-          status = EXCLUDED.status,
-          updated_at = now()
-        RETURNING id::text
-      `,
-      [
-        seed.slug,
-        seed.category,
-        seed.tags,
-        imageUrl,
-        seed.featured,
-        seed.sortOrder,
-        seed.status,
-      ],
-    );
-    const serviceId = serviceResult.rows[0]?.id;
+      const serviceId = service?.id;
 
-    if (!serviceId) {
-      throw new Error(`Failed to upsert ${seed.slug}`);
-    }
+      if (!serviceId) {
+        throw new Error(`Failed to upsert ${seed.slug}`);
+      }
 
-    for (const locale of Object.keys(seed.translations) as Locale[]) {
-      const translation = seed.translations[locale];
-
-      await pool.query(
-        `
-          INSERT INTO service_item_translations
-            (
-              service_item_id,
-              locale,
-              title,
-              subtitle,
-              summary,
-              description,
-              highlights,
-              recommended_for,
-              process_steps,
-              recovery,
-              duration,
-              price_note,
-              image_alt
-            )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-          ON CONFLICT (service_item_id, locale)
-          DO UPDATE SET
-            title = EXCLUDED.title,
-            subtitle = EXCLUDED.subtitle,
-            summary = EXCLUDED.summary,
-            description = EXCLUDED.description,
-            highlights = EXCLUDED.highlights,
-            recommended_for = EXCLUDED.recommended_for,
-            process_steps = EXCLUDED.process_steps,
-            recovery = EXCLUDED.recovery,
-            duration = EXCLUDED.duration,
-            price_note = EXCLUDED.price_note,
-            image_alt = EXCLUDED.image_alt,
-            updated_at = now()
-        `,
-        [
-          serviceId,
+      for (const locale of Object.keys(seed.translations) as Locale[]) {
+        const translation = seed.translations[locale];
+        const detail = getServiceDetailContent(
+          {
+            id: serviceId,
+            slug: seed.slug,
+            category: seed.category,
+            tags: seed.tags,
+            imageUrl,
+            imageAlt: seed.imageAlt[locale],
+            featured: seed.featured,
+            sortOrder: seed.sortOrder,
+            status: seed.status,
+            title: translation.title,
+            subtitle: translation.subtitle,
+            summary: translation.summary,
+            description: translation.description,
+            highlights: translation.highlights,
+            recommendedFor: translation.recommendedFor,
+            process: translation.process,
+            recovery: translation.recovery,
+            duration: translation.duration,
+            priceNote: translation.priceNote,
+          },
           locale,
-          translation.title,
-          translation.subtitle,
-          translation.summary,
-          translation.description,
-          translation.highlights,
-          translation.recommendedFor,
-          translation.process,
-          translation.recovery,
-          translation.duration,
-          translation.priceNote,
-          seed.imageAlt[locale],
-        ],
-      );
+        );
+
+        const detailPanels = await uploadDetailPanels(detail.detailPanels, seed.slug);
+        const beforeAfter = await uploadBeforeAfter(detail.beforeAfter, seed.slug);
+        const richDetailImages = await uploadRichDetailImages(detail.richDetailImages, seed.slug);
+        const youtubeVideos = await uploadYoutubeVideos(detail.youtubeVideos, seed.slug);
+        const values = {
+          serviceItemId: serviceId,
+          locale,
+          title: translation.title,
+          subtitle: translation.subtitle,
+          summary: translation.summary,
+          description: translation.description,
+          highlights: translation.highlights,
+          recommendedFor: translation.recommendedFor,
+          processSteps: translation.process,
+          recovery: translation.recovery,
+          duration: translation.duration,
+          priceNote: translation.priceNote,
+          imageAlt: seed.imageAlt[locale],
+          surgeryInfo: detail.surgeryInfo,
+          detailPanels,
+          beforeAfter,
+          richDetailImages,
+          youtubeVideos,
+          detailCta: detail.detailCta,
+        };
+
+        await getDb()
+          .insert(serviceItemTranslations)
+          .values(values)
+          .onConflictDoUpdate({
+            target: [serviceItemTranslations.serviceItemId, serviceItemTranslations.locale],
+            set: {
+              title: values.title,
+              subtitle: values.subtitle,
+              summary: values.summary,
+              description: values.description,
+              highlights: values.highlights,
+              recommendedFor: values.recommendedFor,
+              processSteps: values.processSteps,
+              recovery: values.recovery,
+              duration: values.duration,
+              priceNote: values.priceNote,
+              imageAlt: values.imageAlt,
+              surgeryInfo: values.surgeryInfo,
+              detailPanels: values.detailPanels,
+              beforeAfter: values.beforeAfter,
+              richDetailImages: values.richDetailImages,
+              youtubeVideos: values.youtubeVideos,
+              detailCta: values.detailCta,
+              updatedAt: sql`now()`,
+            },
+          });
+      }
+
+      console.log(`seeded ${seed.slug}`);
     }
 
-    console.log(`seeded ${seed.slug}`);
+    await seedAdminUsers();
+    await seedBlogPosts();
+    await seedInquiries();
+  } finally {
+    await closeDatabase();
   }
-
-  await seedAdminUsers(pool);
-  await seedBlogPosts(pool);
-  await seedInquiries(pool);
-
-  await pool.end();
 }
 
-async function seedAdminUsers(pool: Pool) {
+async function uploadRichDetailImages(
+  images: { title: string; imageUrl: string; imageAlt: string }[],
+  slug: string,
+) {
+  return Promise.all(
+    images.map(async (image, index) => ({
+      ...image,
+      imageUrl: await uploadSeedAsset(
+        image.imageUrl,
+        `${slug}-detail-${String(index + 1).padStart(2, "0")}`,
+        "service-rich-details",
+      ),
+    })),
+  );
+}
+
+async function uploadDetailPanels<T extends { imageUrl: string }>(
+  panels: T[],
+  slug: string,
+) {
+  return Promise.all(
+    panels.map(async (panel, index) => ({
+      ...panel,
+      imageUrl: await uploadSeedAsset(
+        panel.imageUrl,
+        `${slug}-panel-${String(index + 1).padStart(2, "0")}`,
+        "service-detail-panels",
+      ),
+    })),
+  );
+}
+
+async function uploadBeforeAfter<T extends { beforeImageUrl: string; afterImageUrl: string }>(
+  beforeAfter: T,
+  slug: string,
+) {
+  return {
+    ...beforeAfter,
+    beforeImageUrl: await uploadSeedAsset(
+      beforeAfter.beforeImageUrl,
+      `${slug}-before`,
+      "service-before-after",
+    ),
+    afterImageUrl: await uploadSeedAsset(
+      beforeAfter.afterImageUrl,
+      `${slug}-after`,
+      "service-before-after",
+    ),
+  };
+}
+
+async function uploadYoutubeVideos<T extends { thumbnailUrl: string }>(
+  videos: T[],
+  slug: string,
+) {
+  return Promise.all(
+    videos.map(async (video, index) => ({
+      ...video,
+      thumbnailUrl: await uploadSeedAsset(
+        video.thumbnailUrl,
+        `${slug}-video-${String(index + 1).padStart(2, "0")}`,
+        "service-video-thumbnails",
+      ),
+    })),
+  );
+}
+
+function getRelatedSlugs(slug: string) {
+  const relatedMap: Record<string, string[]> = {
+    "natural-eye-design": ["balanced-rhinoplasty", "petit-facial-balancing"],
+    "balanced-rhinoplasty": ["natural-eye-design", "petit-facial-balancing"],
+    "deep-structure-lifting": ["petit-facial-balancing", "natural-eye-design"],
+    "petit-facial-balancing": ["deep-structure-lifting", "natural-eye-design"],
+  };
+
+  return relatedMap[slug] ?? [];
+}
+
+async function seedAdminUsers() {
   for (const seed of adminUserSeeds) {
-    await pool.query(
-      `
-        INSERT INTO admin_users (name, email, role, status)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (email)
-        DO UPDATE SET
-          name = EXCLUDED.name,
-          role = EXCLUDED.role,
-          status = EXCLUDED.status,
-          updated_at = now()
-      `,
-      [seed.name, seed.email, seed.role, seed.status],
-    );
+    await getDb()
+      .insert(adminUsers)
+      .values({
+        name: seed.name,
+        email: seed.email,
+        role: seed.role,
+        status: seed.status,
+      })
+      .onConflictDoUpdate({
+        target: adminUsers.email,
+        set: {
+          name: seed.name,
+          role: seed.role,
+          status: seed.status,
+          updatedAt: sql`now()`,
+        },
+      });
 
     console.log(`seeded admin user ${seed.email}`);
   }
 }
 
-async function seedBlogPosts(pool: Pool) {
+async function seedBlogPosts() {
   for (const seed of blogPostSeeds) {
     const imageUrl = await uploadSeedAsset(seed.imageUrl, seed.slug, "blog");
 
-    await pool.query(
-      `
-        INSERT INTO blog_posts
-          (title, slug, excerpt, category, status, image_url, tags)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (slug)
-        DO UPDATE SET
-          title = EXCLUDED.title,
-          excerpt = EXCLUDED.excerpt,
-          category = EXCLUDED.category,
-          status = EXCLUDED.status,
-          image_url = EXCLUDED.image_url,
-          tags = EXCLUDED.tags,
-          updated_at = now()
-      `,
-      [
-        seed.title,
-        seed.slug,
-        seed.excerpt,
-        seed.category,
-        seed.status,
+    await getDb()
+      .insert(blogPosts)
+      .values({
+        title: seed.title,
+        slug: seed.slug,
+        excerpt: seed.excerpt,
+        category: seed.category,
+        status: seed.status,
         imageUrl,
-        seed.tags,
-      ],
-    );
+        tags: seed.tags,
+      })
+      .onConflictDoUpdate({
+        target: blogPosts.slug,
+        set: {
+          title: seed.title,
+          excerpt: seed.excerpt,
+          category: seed.category,
+          status: seed.status,
+          imageUrl,
+          tags: seed.tags,
+          updatedAt: sql`now()`,
+        },
+      });
 
     console.log(`seeded blog ${seed.slug}`);
   }
 }
 
-async function seedInquiries(pool: Pool) {
+async function seedInquiries() {
   for (const seed of inquirySeeds) {
-    const existing = await pool.query<{ id: string }>(
-      "SELECT id::text FROM inquiries WHERE seed_key = $1 LIMIT 1",
-      [seed.seedKey],
-    );
+    const [existing] = await getDb()
+      .select({ id: inquiries.id })
+      .from(inquiries)
+      .where(eq(inquiries.seedKey, seed.seedKey))
+      .limit(1);
 
-    if (existing.rows[0]?.id) {
-      await pool.query(
-        `
-          UPDATE inquiries
-          SET
-            name = $2,
-            phone = $3,
-            email = $4,
-            interest = $5,
-            preferred_channel = $6,
-            message = $7,
-            status = $8,
-            updated_at = now()
-          WHERE seed_key = $1
-        `,
-        [
-          seed.seedKey,
-          seed.name,
-          seed.phone,
-          seed.email,
-          seed.interest,
-          seed.preferredChannel,
-          seed.message,
-          seed.status,
-        ],
-      );
+    if (existing?.id) {
+      await getDb()
+        .update(inquiries)
+        .set({
+          name: seed.name,
+          phone: seed.phone,
+          email: seed.email,
+          interest: seed.interest,
+          preferredChannel: seed.preferredChannel,
+          message: seed.message,
+          status: seed.status,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(inquiries.seedKey, seed.seedKey));
     } else {
-      await pool.query(
-        `
-          INSERT INTO inquiries
-            (seed_key, name, phone, email, interest, preferred_channel, message, status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        `,
-        [
-          seed.seedKey,
-          seed.name,
-          seed.phone,
-          seed.email,
-          seed.interest,
-          seed.preferredChannel,
-          seed.message,
-          seed.status,
-        ],
-      );
+      await getDb().insert(inquiries).values({
+        seedKey: seed.seedKey,
+        name: seed.name,
+        phone: seed.phone,
+        email: seed.email,
+        interest: seed.interest,
+        preferredChannel: seed.preferredChannel,
+        message: seed.message,
+        status: seed.status,
+      });
     }
 
     console.log(`seeded inquiry ${seed.seedKey}`);

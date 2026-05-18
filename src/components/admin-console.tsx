@@ -21,11 +21,16 @@ import {
 import { useState } from "react";
 import {
   servicePageCopy,
+  type ServiceBeforeAfter,
   type ServiceContentCategory,
+  type ServiceDetailCta,
+  type ServiceDetailPanel,
   type ServiceItem,
-  type ServiceStatus,
+  type ServiceRichDetailImage,
+  type ServiceSurgeryInfo,
+  type ServiceVideoPreview,
 } from "@/data/service-content";
-import type { Locale } from "@/i18n/config";
+import { localeLabels, locales, type Locale } from "@/i18n/config";
 
 type AdminTab = "dashboard" | "users" | "services" | "blog" | "inquire";
 
@@ -61,7 +66,7 @@ const emptyService: Partial<ServiceItem> = {
   imageAlt: "",
   featured: false,
   sortOrder: 100,
-  status: "draft",
+  status: "published",
   title: "",
   subtitle: "",
   summary: "",
@@ -72,6 +77,30 @@ const emptyService: Partial<ServiceItem> = {
   recovery: "",
   duration: "",
   priceNote: "",
+  surgeryInfo: {
+    surgeryTime: "",
+    anesthesia: "",
+    visits: "",
+    aftercareStart: "",
+    recoveryPeriod: "",
+  },
+  detailPanels: [],
+  beforeAfter: {
+    title: "",
+    body: "",
+    beforeImageUrl: "",
+    beforeAlt: "",
+    afterImageUrl: "",
+    afterAlt: "",
+  },
+  richDetailImages: [],
+  youtubeVideos: [],
+  detailCta: {
+    title: "",
+    body: "",
+  },
+  relatedSlugs: [],
+  embedding: [],
 };
 
 const emptyRecord: AdminRecord = {
@@ -86,10 +115,11 @@ const emptyRecord: AdminRecord = {
 
 export function AdminConsole({ locale }: { locale: Locale }) {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
+  const [serviceLocale, setServiceLocale] = useState<Locale>(locale);
   const queryClient = useQueryClient();
   const serviceQuery = useQuery({
-    queryKey: ["admin-services", locale],
-    queryFn: () => fetchJson<ListResponse<ServiceItem>>(`/api/admin/services?locale=${locale}`),
+    queryKey: ["admin-services", serviceLocale],
+    queryFn: () => fetchJson<ListResponse<ServiceItem>>(`/api/admin/services?locale=${serviceLocale}`),
   });
   const userQuery = useQuery({
     queryKey: ["admin-resource", "users"],
@@ -146,11 +176,12 @@ export function AdminConsole({ locale }: { locale: Locale }) {
               <DashboardPanel counts={counts} />
             ) : activeTab === "services" ? (
               <ServiceCrudPanel
-                locale={locale}
+                locale={serviceLocale}
+                onLocaleChange={setServiceLocale}
                 items={serviceQuery.data?.items ?? []}
                 source={serviceQuery.data?.source}
                 loading={serviceQuery.isLoading}
-                onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin-services", locale] })}
+                onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin-services", serviceLocale] })}
               />
             ) : (
               <GenericCrudPanel
@@ -203,12 +234,14 @@ function DashboardPanel({ counts }: { counts: Record<string, number> }) {
 
 function ServiceCrudPanel({
   locale,
+  onLocaleChange,
   items,
   source,
   loading,
   onChanged,
 }: {
   locale: Locale;
+  onLocaleChange: (locale: Locale) => void;
   items: ServiceItem[];
   source?: "database" | "fallback";
   loading: boolean;
@@ -245,6 +278,86 @@ function ServiceCrudPanel({
     },
     onError: (error) => setNotice(error instanceof Error ? error.message : "삭제에 실패했습니다."),
   });
+  const translateMutation = useMutation({
+    mutationFn: async () => {
+      if (!editing.id) {
+        throw new Error("Select a saved service first.");
+      }
+
+      return fetchJson<Partial<ServiceItem>>("/api/admin/services/translate", {
+        method: "POST",
+        body: JSON.stringify({
+          serviceId: editing.id,
+          targetLocale: locale,
+          sourceLocale: "ko",
+        }),
+      });
+    },
+    onSuccess: (translated) => {
+      setEditing((current) => ({
+        ...current,
+        ...translated,
+        id: current.id,
+        slug: current.slug,
+        category: current.category,
+        tags: current.tags,
+        imageUrl: current.imageUrl,
+        status: current.status,
+      }));
+      setNotice(`${localeLabels[locale]} draft text generated from Korean.`);
+    },
+    onError: (error) => setNotice(error instanceof Error ? error.message : "Translation failed."),
+  });
+  const surgeryInfo = editing.surgeryInfo ?? emptyService.surgeryInfo;
+  const beforeAfter = editing.beforeAfter ?? emptyService.beforeAfter;
+  const detailCta = editing.detailCta ?? emptyService.detailCta;
+
+  function updateSurgeryInfo(field: keyof ServiceSurgeryInfo, value: string) {
+    setEditing({
+      ...editing,
+      surgeryInfo: {
+        ...(surgeryInfo as ServiceSurgeryInfo),
+        [field]: value,
+      },
+    });
+  }
+
+  function updateBeforeAfter(field: keyof ServiceBeforeAfter, value: string) {
+    setEditing({
+      ...editing,
+      beforeAfter: {
+        ...(beforeAfter as ServiceBeforeAfter),
+        [field]: value,
+      },
+    });
+  }
+
+  function updateDetailCta(field: keyof ServiceDetailCta, value: string) {
+    setEditing({
+      ...editing,
+      detailCta: {
+        ...(detailCta as ServiceDetailCta),
+        [field]: value,
+      },
+    });
+  }
+
+  function updatePanel(index: number, patch: Partial<ServiceDetailPanel>) {
+    const panels = [...(editing.detailPanels ?? [])];
+    const current = panels[index] ?? {
+      eyebrow: String(index + 1).padStart(2, "0"),
+      title: "",
+      body: "",
+      imageUrl: "",
+      imageAlt: "",
+      points: [],
+    };
+    panels[index] = {
+      ...current,
+      ...patch,
+    };
+    setEditing({ ...editing, detailPanels: panels });
+  }
 
   return (
     <CrudShell
@@ -258,7 +371,27 @@ function ServiceCrudPanel({
         </button>
       }
     >
-      <div className="grid gap-6 xl:grid-cols-[1fr_390px]">
+      <div className="mb-5 flex flex-wrap gap-2">
+        {locales.map((item) => (
+          <button
+            key={item}
+            className={`rounded-full border px-4 py-2 text-xs font-black transition ${
+              locale === item
+                ? "border-[#d62f55] bg-[#d62f55] text-white"
+                : "border-white/10 bg-white/[0.04] text-white/62 hover:border-[#dec47b]/60 hover:text-[#dec47b]"
+            }`}
+            onClick={() => {
+              onLocaleChange(item);
+              setEditing(emptyService);
+            }}
+            type="button"
+          >
+            {localeLabels[item]}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_430px]">
         <div className="grid gap-4">
           {items.map((item) => (
             <article key={item.id} className="glass-panel grid gap-4 p-4 md:grid-cols-[132px_1fr_auto]">
@@ -279,6 +412,20 @@ function ServiceCrudPanel({
                 </div>
                 <h4 className="font-display mt-3 text-3xl">{item.title}</h4>
                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#d9d0c9]">{item.summary}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className={`rounded-full px-3 py-1 text-[0.68rem] font-black uppercase ${
+                    item.status === "published"
+                      ? "bg-[#dec47b]/14 text-[#dec47b]"
+                      : "bg-white/8 text-white/52"
+                  }`}>
+                    {item.status === "published" ? "Public" : "Draft"}
+                  </span>
+                  {(item.youtubeVideos?.length ?? 0) > 0 ? (
+                    <span className="rounded-full bg-white/8 px-3 py-1 text-[0.68rem] font-black uppercase text-white/52">
+                      {item.youtubeVideos?.length} videos
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <div className="flex items-start gap-2">
                 <button className="social-action-button" onClick={() => setEditing(item)} title="Edit" type="button">
@@ -305,6 +452,42 @@ function ServiceCrudPanel({
           }}
         >
           <p className="eyebrow text-[#dec47b]">{isEditing ? "Edit Service" : "Create Service"}</p>
+          {locale !== "ko" && editing.id ? (
+            <button
+              className="button-outline mt-4 w-full"
+              disabled={translateMutation.isPending}
+              onClick={() => translateMutation.mutate()}
+              type="button"
+            >
+              {translateMutation.isPending ? <Loader2 className="animate-spin" size={15} /> : null}
+              Translate from KR
+            </button>
+          ) : null}
+          <div className="mt-4 flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] p-3">
+            <div>
+              <p className="text-sm font-black text-white">Public</p>
+              <p className="mt-1 text-xs leading-5 text-white/52">Published services are visible on the website.</p>
+            </div>
+            <button
+              className={`h-7 w-14 rounded-full p-1 transition ${
+                editing.status === "published" ? "bg-[#d62f55]" : "bg-white/12"
+              }`}
+              onClick={() =>
+                setEditing({
+                  ...editing,
+                  status: editing.status === "published" ? "draft" : "published",
+                })
+              }
+              type="button"
+              aria-pressed={editing.status === "published"}
+            >
+              <span
+                className={`block h-5 w-5 rounded-full bg-white transition ${
+                  editing.status === "published" ? "translate-x-7" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
           <div className="mt-5 grid gap-3">
             <Field label="Slug" value={editing.slug ?? ""} onChange={(value) => setEditing({ ...editing, slug: value })} />
             <Field label="Title" value={editing.title ?? ""} onChange={(value) => setEditing({ ...editing, title: value })} />
@@ -324,11 +507,10 @@ function ServiceCrudPanel({
                   })
                 }
               />
-              <Select
-                label="Status"
-                value={editing.status ?? "draft"}
-                options={["draft", "published", "archived"]}
-                onChange={(value) => setEditing({ ...editing, status: value as ServiceStatus })}
+              <Field
+                label="Sort Order"
+                value={editing.sortOrder ?? 100}
+                onChange={(value) => setEditing({ ...editing, sortOrder: Number(value) || 100 })}
               />
             </div>
             <Field
@@ -343,6 +525,11 @@ function ServiceCrudPanel({
                     .filter(Boolean) as ServiceContentCategory[],
                 })
               }
+            />
+            <Field
+              label="Related Slugs"
+              value={(editing.relatedSlugs ?? []).join(", ")}
+              onChange={(value) => setEditing({ ...editing, relatedSlugs: splitComma(value) })}
             />
             <UploadField
               label="Image / Video / File"
@@ -368,14 +555,144 @@ function ServiceCrudPanel({
             <Textarea label="Recovery" value={editing.recovery ?? ""} onChange={(value) => setEditing({ ...editing, recovery: value })} />
             <Field label="Duration" value={editing.duration ?? ""} onChange={(value) => setEditing({ ...editing, duration: value })} />
             <Textarea label="Price Note" value={editing.priceNote ?? ""} onChange={(value) => setEditing({ ...editing, priceNote: value })} />
+
+            <EditorDivider title="Surgery Info" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Surgery Time" value={(surgeryInfo as ServiceSurgeryInfo).surgeryTime} onChange={(value) => updateSurgeryInfo("surgeryTime", value)} />
+              <Field label="Anesthesia" value={(surgeryInfo as ServiceSurgeryInfo).anesthesia} onChange={(value) => updateSurgeryInfo("anesthesia", value)} />
+              <Field label="Visits" value={(surgeryInfo as ServiceSurgeryInfo).visits} onChange={(value) => updateSurgeryInfo("visits", value)} />
+              <Field label="Aftercare Start" value={(surgeryInfo as ServiceSurgeryInfo).aftercareStart} onChange={(value) => updateSurgeryInfo("aftercareStart", value)} />
+            </div>
+            <Field label="Recovery Period" value={(surgeryInfo as ServiceSurgeryInfo).recoveryPeriod} onChange={(value) => updateSurgeryInfo("recoveryPeriod", value)} />
+
+            <EditorDivider title="Long Detail Panels" />
+            {[0, 1, 2].map((index) => (
+              <DetailPanelEditor
+                key={index}
+                index={index}
+                panel={(editing.detailPanels ?? [])[index]}
+                onChange={(patch) => updatePanel(index, patch)}
+              />
+            ))}
+
+            <EditorDivider title="Before & After" />
+            <Field label="Comparison Title" value={(beforeAfter as ServiceBeforeAfter).title} onChange={(value) => updateBeforeAfter("title", value)} />
+            <Textarea label="Comparison Body" value={(beforeAfter as ServiceBeforeAfter).body} onChange={(value) => updateBeforeAfter("body", value)} />
+            <UploadField
+              label="Before Image"
+              value={(beforeAfter as ServiceBeforeAfter).beforeImageUrl}
+              scope="service-detail"
+              onChange={(value) => updateBeforeAfter("beforeImageUrl", value)}
+            />
+            <Field label="Before Alt" value={(beforeAfter as ServiceBeforeAfter).beforeAlt} onChange={(value) => updateBeforeAfter("beforeAlt", value)} />
+            <UploadField
+              label="After Image"
+              value={(beforeAfter as ServiceBeforeAfter).afterImageUrl}
+              scope="service-detail"
+              onChange={(value) => updateBeforeAfter("afterImageUrl", value)}
+            />
+            <Field label="After Alt" value={(beforeAfter as ServiceBeforeAfter).afterAlt} onChange={(value) => updateBeforeAfter("afterAlt", value)} />
+
+            <EditorDivider title="Rich Detail Images" />
+            <UploadField
+              label="Upload Long Detail Image"
+              value=""
+              scope="service-rich-details"
+              onChange={(imageUrl) =>
+                setEditing({
+                  ...editing,
+                  richDetailImages: [
+                    ...(editing.richDetailImages ?? []),
+                    {
+                      title: "",
+                      imageAlt: "",
+                      imageUrl,
+                    },
+                  ],
+                })
+              }
+            />
+            <Textarea
+              label="Images: title | alt | imageUrl"
+              value={formatRichDetailImages(editing.richDetailImages)}
+              onChange={(value) => setEditing({ ...editing, richDetailImages: parseRichDetailImages(value) })}
+            />
+
+            <EditorDivider title="YouTube Preview" />
+            <Textarea
+              label="Videos: title | description | videoId | thumbnailUrl"
+              value={formatVideos(editing.youtubeVideos)}
+              onChange={(value) => setEditing({ ...editing, youtubeVideos: parseVideos(value) })}
+            />
+
+            <EditorDivider title="Detail CTA" />
+            <Field label="CTA Title" value={(detailCta as ServiceDetailCta).title} onChange={(value) => updateDetailCta("title", value)} />
+            <Textarea label="CTA Body" value={(detailCta as ServiceDetailCta).body} onChange={(value) => updateDetailCta("body", value)} />
           </div>
-          <button className="button-primary mt-5 w-full" disabled={saveMutation.isPending} type="submit">
-            {saveMutation.isPending ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />}
-            Save
-          </button>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <button className="button-primary w-full" disabled={saveMutation.isPending} type="submit">
+              {saveMutation.isPending ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />}
+              Save
+            </button>
+            <button
+              className="button-outline w-full"
+              disabled={saveMutation.isPending}
+              onClick={() => saveMutation.mutate({ ...editing, status: "draft" })}
+              type="button"
+            >
+              Save Draft
+            </button>
+          </div>
         </form>
       </div>
     </CrudShell>
+  );
+}
+
+function EditorDivider({ title }: { title: string }) {
+  return (
+    <div className="pt-3">
+      <p className="border-t border-white/10 pt-4 text-xs font-black uppercase tracking-[0.16em] text-[#dec47b]">
+        {title}
+      </p>
+    </div>
+  );
+}
+
+function DetailPanelEditor({
+  index,
+  panel,
+  onChange,
+}: {
+  index: number;
+  panel?: ServiceDetailPanel;
+  onChange: (patch: Partial<ServiceDetailPanel>) => void;
+}) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.025] p-3">
+      <p className="mb-3 text-xs font-black uppercase text-white/52">Panel {index + 1}</p>
+      <div className="grid gap-3">
+        <Field
+          label="Eyebrow"
+          value={panel?.eyebrow ?? String(index + 1).padStart(2, "0")}
+          onChange={(value) => onChange({ eyebrow: value })}
+        />
+        <Field label="Title" value={panel?.title ?? ""} onChange={(value) => onChange({ title: value })} />
+        <Textarea label="Body" value={panel?.body ?? ""} onChange={(value) => onChange({ body: value })} />
+        <UploadField
+          label="Panel Image"
+          value={panel?.imageUrl ?? ""}
+          scope="service-detail"
+          onChange={(value) => onChange({ imageUrl: value })}
+        />
+        <Field label="Image Alt" value={panel?.imageAlt ?? ""} onChange={(value) => onChange({ imageAlt: value })} />
+        <Textarea
+          label="Points"
+          value={(panel?.points ?? []).join("\n")}
+          onChange={(value) => onChange({ points: splitLines(value) })}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -676,4 +993,70 @@ function splitLines(value: string) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function splitComma(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formatVideos(videos: ServiceVideoPreview[] | undefined) {
+  return (videos ?? [])
+    .map((video) =>
+      [video.title, video.description, video.videoId, video.thumbnailUrl]
+        .map((item) => item ?? "")
+        .join(" | "),
+    )
+    .join("\n");
+}
+
+function parseVideos(value: string): ServiceVideoPreview[] {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [title = "", description = "", videoId = "", thumbnailUrl = ""] = line
+        .split("|")
+        .map((item) => item.trim());
+
+      return {
+        title,
+        description,
+        videoId,
+        thumbnailUrl,
+      };
+    })
+    .filter((video) => video.title);
+}
+
+function formatRichDetailImages(images: ServiceRichDetailImage[] | undefined) {
+  return (images ?? [])
+    .map((image) =>
+      [image.title, image.imageAlt, image.imageUrl]
+        .map((item) => item ?? "")
+        .join(" | "),
+    )
+    .join("\n");
+}
+
+function parseRichDetailImages(value: string): ServiceRichDetailImage[] {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [title = "", imageAlt = "", imageUrl = ""] = line
+        .split("|")
+        .map((item) => item.trim());
+
+      return {
+        title,
+        imageAlt,
+        imageUrl,
+      };
+    })
+    .filter((image) => image.imageUrl);
 }

@@ -1,6 +1,12 @@
-import { Pool, type QueryResultRow } from "@neondatabase/serverless";
+import { Pool } from "@neondatabase/serverless";
+import { sql } from "drizzle-orm";
+import { drizzle, type NeonDatabase } from "drizzle-orm/neon-serverless";
+import * as schema from "../db/schema";
+
+type Database = NeonDatabase<typeof schema> & { $client: Pool };
 
 let pool: Pool | undefined;
+let database: Database | undefined;
 
 export function getDatabaseUrl() {
   return (
@@ -15,7 +21,7 @@ export function hasDatabaseConnection() {
   return Boolean(getDatabaseUrl());
 }
 
-function getPool() {
+export function getDb() {
   const connectionString = getDatabaseUrl();
 
   if (!connectionString) {
@@ -26,16 +32,19 @@ function getPool() {
     pool = new Pool({ connectionString });
   }
 
-  return pool;
+  if (!database) {
+    database = drizzle(pool, { schema }) as Database;
+  }
+
+  return database;
 }
 
-export async function dbQuery<T extends QueryResultRow = QueryResultRow>(
-  text: string,
-  params: unknown[] = [],
-) {
-  return getPool().query<T>(text, params);
+export async function executeSchemaSql(schemaSql: string) {
+  await getDb().execute(sql.raw(schemaSql));
 }
 
-export function toPostgresArray(values: string[]) {
-  return `{${values.map((value) => `"${value.replaceAll('"', '\\"')}"`).join(",")}}`;
+export async function closeDatabase() {
+  await pool?.end();
+  pool = undefined;
+  database = undefined;
 }
