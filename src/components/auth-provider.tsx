@@ -358,6 +358,29 @@ function logAuthDebug(event: string, payload?: unknown) {
   }
 
   console.info(AUTH_LOG_PREFIX, event, payload ?? "");
+  sendAuthDebugLog(event, payload);
+}
+
+function sendAuthDebugLog(event: string, payload?: unknown) {
+  const body = JSON.stringify({
+    event,
+    payload,
+    href: window.location.href,
+    path: window.location.pathname,
+    timestamp: new Date().toISOString(),
+  });
+
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon("/api/auth/debug-log", new Blob([body], { type: "application/json" }));
+    return;
+  }
+
+  void fetch("/api/auth/debug-log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+    keepalive: true,
+  }).catch(() => {});
 }
 
 function describeFirebaseUser(user: User | null) {

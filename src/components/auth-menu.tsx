@@ -420,6 +420,26 @@ function AuthDialog({
 
 function logAuthUi(event: string, payload?: unknown) {
   console.info(AUTH_LOG_PREFIX, event, payload ?? "");
+
+  const body = JSON.stringify({
+    event,
+    payload,
+    href: window.location.href,
+    path: window.location.pathname,
+    timestamp: new Date().toISOString(),
+  });
+
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon("/api/auth/debug-log", new Blob([body], { type: "application/json" }));
+    return;
+  }
+
+  void fetch("/api/auth/debug-log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+    keepalive: true,
+  }).catch(() => {});
 }
 
 function maskEmail(email: string) {
