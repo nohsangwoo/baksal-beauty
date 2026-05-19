@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth-provider";
 import type { Locale } from "@/i18n/config";
 
 type AuthMode = "login" | "register";
+const AUTH_LOG_PREFIX = "[BAKSAL_AUTH]";
 
 type AuthCopy = {
   login: string;
@@ -138,7 +139,14 @@ export function AuthMenu({ locale }: { locale: Locale }) {
   if (!user) {
     return (
       <>
-        <button className="button-outline h-10 px-3 text-[0.68rem]" onClick={() => setModalOpen(true)} type="button">
+        <button
+          className="button-outline h-10 px-3 text-[0.68rem]"
+          onClick={() => {
+            logAuthUi("header.loginButton.click", { locale, path: window.location.pathname });
+            setModalOpen(true);
+          }}
+          type="button"
+        >
           <LogIn size={15} />
           <span className="hidden sm:inline">{copy.login}</span>
         </button>
@@ -148,6 +156,7 @@ export function AuthMenu({ locale }: { locale: Locale }) {
             externalError={redirectError}
             onClearExternalError={clearRedirectError}
             onClose={() => {
+              logAuthUi("dialog.close", { locale, path: window.location.pathname });
               clearRedirectError();
               setModalOpen(false);
             }}
@@ -199,7 +208,8 @@ export function AuthMenu({ locale }: { locale: Locale }) {
         </button>
         <button
           className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-[#ff8ba0] transition hover:bg-[#d62f55]/10 hover:text-white"
-          onClick={async () => {
+        onClick={async () => {
+            logAuthUi("profileMenu.logout.click", { email: maskEmail(user.email ?? "") });
             setMenuOpen(false);
             await logout();
           }}
@@ -237,6 +247,12 @@ function AuthDialog({
     event.preventDefault();
     setBusy(true);
     setError("");
+    logAuthUi("dialog.form.submit", {
+      mode,
+      email: maskEmail(email),
+      hasDisplayName: Boolean(displayName.trim()),
+      path: window.location.pathname,
+    });
 
     try {
       if (mode === "login") {
@@ -245,10 +261,17 @@ function AuthDialog({
         await registerWithEmail(email, password, displayName);
       }
 
+      logAuthUi("dialog.form.success", { mode, email: maskEmail(email) });
       onClose();
     } catch (caught) {
+      logAuthUi("dialog.form.error", {
+        mode,
+        email: maskEmail(email),
+        error: getAuthErrorDebug(caught),
+      });
       setError(getAuthErrorMessage(caught));
     } finally {
+      logAuthUi("dialog.form.finally", { mode, email: maskEmail(email) });
       setBusy(false);
     }
   }
@@ -257,10 +280,12 @@ function AuthDialog({
     setBusy(true);
     setError("");
     onClearExternalError?.();
+    logAuthUi("dialog.google.click", { path: window.location.pathname });
 
     try {
       await loginWithGoogle();
     } catch (caught) {
+      logAuthUi("dialog.google.error", { error: getAuthErrorDebug(caught) });
       setError(getAuthErrorMessage(caught));
     } finally {
       setBusy(false);
@@ -291,6 +316,7 @@ function AuthDialog({
               }`}
               key={item}
               onClick={() => {
+                logAuthUi("dialog.mode.click", { nextMode: item, previousMode: mode });
                 setMode(item);
                 setError("");
                 onClearExternalError?.();
@@ -367,6 +393,39 @@ function AuthDialog({
       </div>
     </div>
   );
+}
+
+function logAuthUi(event: string, payload?: unknown) {
+  console.info(AUTH_LOG_PREFIX, event, payload ?? "");
+}
+
+function maskEmail(email: string) {
+  if (!email || !email.includes("@")) {
+    return email || "(empty)";
+  }
+
+  const [name, domain] = email.trim().toLowerCase().split("@");
+  const safeName = name.length <= 2 ? `${name[0] ?? ""}*` : `${name.slice(0, 2)}***${name.slice(-1)}`;
+
+  return `${safeName}@${domain}`;
+}
+
+function getAuthErrorDebug(error: unknown) {
+  if (error instanceof FirebaseError) {
+    return {
+      code: error.code,
+      message: error.message,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+
+  return { message: String(error) };
 }
 
 function getAuthErrorMessage(error: unknown) {

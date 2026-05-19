@@ -33,6 +33,7 @@ type AuthNotice = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const AUTH_LOG_PREFIX = "[BAKSAL_AUTH]";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -60,18 +61,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function pushStateWithAuthDebug(...args) {
+      logAuthDebug("history.pushState", { url: String(args[2] ?? ""), currentPath: window.location.pathname });
+      return originalPushState.apply(this, args);
+    };
+
+    window.history.replaceState = function replaceStateWithAuthDebug(...args) {
+      logAuthDebug("history.replaceState", { url: String(args[2] ?? ""), currentPath: window.location.pathname });
+      return originalReplaceState.apply(this, args);
+    };
+
+    const logPopState = () => {
+      logAuthDebug("window.popstate", { href: window.location.href });
+    };
+    const logPointerClick = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest("button,a") : null;
+
+      if (!target) {
+        return;
+      }
+
+      const text = target.textContent?.replace(/\s+/g, " ").trim().slice(0, 80) || "";
+      const href = target instanceof HTMLAnchorElement ? target.href : "";
+      const shouldLog =
+        href.includes("/admin") ||
+        text.includes("로그") ||
+        text.includes("회원") ||
+        text.includes("Google") ||
+        target.closest('[role="dialog"]');
+
+      if (shouldLog) {
+        logAuthDebug("document.click", {
+          tag: target.tagName.toLowerCase(),
+          text,
+          href,
+          path: window.location.pathname,
+        });
+      }
+    };
+
+    window.addEventListener("popstate", logPopState);
+    document.addEventListener("click", logPointerClick, true);
+
+    return () => {
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+      window.removeEventListener("popstate", logPopState);
+      document.removeEventListener("click", logPointerClick, true);
+    };
+  }, []);
+
+  useEffect(() => {
     const auth = getFirebaseAuth();
+    logAuthDebug("AuthProvider.mount", {
+      path: window.location.pathname,
+      host: window.location.host,
+    });
+
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+      logAuthDebug("onAuthStateChanged", describeFirebaseUser(nextUser));
       setUser(nextUser);
       setLoading(false);
 
       if (nextUser) {
+        logAuthDebug("onAuthStateChanged.sync.start", describeFirebaseUser(nextUser));
         void syncNeonUser(nextUser);
       }
     });
 
+    logAuthDebug("getRedirectResult.start");
     void getRedirectResult(auth)
       .then(async (result) => {
+        logAuthDebug("getRedirectResult.done", {
+          hasResult: Boolean(result),
+          user: describeFirebaseUser(result?.user ?? null),
+        });
+
         if (result?.user) {
           await syncNeonUser(result.user, { throwOnError: true });
           setAuthNotice({
@@ -81,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch((error: unknown) => {
+        logAuthDebug("getRedirectResult.error", describeAuthError(error));
         setRedirectError(error);
         setAuthNotice({
           message: getSyncErrorMessage(error),
@@ -98,17 +167,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       async loginWithEmail(email, password) {
         let credential: UserCredential;
+        const normalizedEmail = email.trim().toLowerCase();
+
+        logAuthDebug("loginWithEmail.submit", {
+          email: maskEmail(normalizedEmail),
+          path: window.location.pathname,
+        });
 
         try {
-          credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+          logAuthDebug("loginWithEmail.firebase.signIn.start", { email: maskEmail(normalizedEmail) });
+          credential = await signInWithEmailAndPassword(getFirebaseAuth(), normalizedEmail, password);
+          logAuthDebug("loginWithEmail.firebase.signIn.success", describeFirebaseUser(credential.user));
         } catch (error) {
+          logAuthDebug("loginWithEmail.firebase.signIn.error", describeAuthError(error));
+
           if (!isMissingEmailAccountError(error)) {
             throw error;
           }
 
           try {
-            credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+            logAuthDebug("loginWithEmail.firebase.autoCreate.start", { email: maskEmail(normalizedEmail) });
+            credential = await createUserWithEmailAndPassword(getFirebaseAuth(), normalizedEmail, password);
+            logAuthDebug("loginWithEmail.firebase.autoCreate.success", describeFirebaseUser(credential.user));
           } catch (createError) {
+            logAuthDebug("loginWithEmail.firebase.autoCreate.error", describeAuthError(createError));
+
             if (isEmailAlreadyInUseError(createError)) {
               throw error;
             }
@@ -132,15 +215,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async registerWithEmail(email, password, displayName) {
         let credential: UserCredential;
+        const normalizedEmail = email.trim().toLowerCase();
+
+        logAuthDebug("registerWithEmail.submit", {
+          email: maskEmail(normalizedEmail),
+          hasDisplayName: Boolean(displayName?.trim()),
+          path: window.location.pathname,
+        });
 
         try {
-          credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+          logAuthDebug("registerWithEmail.firebase.create.start", { email: maskEmail(normalizedEmail) });
+          credential = await createUserWithEmailAndPassword(getFirebaseAuth(), normalizedEmail, password);
+          logAuthDebug("registerWithEmail.firebase.create.success", describeFirebaseUser(credential.user));
         } catch (error) {
+          logAuthDebug("registerWithEmail.firebase.create.error", describeAuthError(error));
+
           if (!isEmailAlreadyInUseError(error)) {
             throw error;
           }
 
-          credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+          logAuthDebug("registerWithEmail.firebase.emailExists.signIn.start", { email: maskEmail(normalizedEmail) });
+          credential = await signInWithEmailAndPassword(getFirebaseAuth(), normalizedEmail, password);
+          logAuthDebug("registerWithEmail.firebase.emailExists.signIn.success", describeFirebaseUser(credential.user));
           await syncNeonUserWithNotice(credential.user, setAuthNotice);
           setAuthNotice({
             message: "이미 가입된 이메일이라 기존 계정으로 로그인하고 회원 정보 저장까지 완료했습니다.",
@@ -150,7 +246,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (displayName?.trim()) {
+          logAuthDebug("registerWithEmail.firebase.updateProfile.start", { email: maskEmail(normalizedEmail) });
           await updateProfile(credential.user, { displayName: displayName.trim() });
+          logAuthDebug("registerWithEmail.firebase.updateProfile.success", describeFirebaseUser(credential.user));
           setUser(credential.user);
         }
 
@@ -163,6 +261,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async loginWithGoogle() {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
+        logAuthDebug("loginWithGoogle.redirect.start", {
+          path: window.location.pathname,
+          host: window.location.host,
+        });
         setAuthNotice({
           message: "Google 로그인 화면으로 이동합니다.",
           tone: "info",
@@ -221,24 +323,123 @@ export function useAuth() {
 
 async function syncNeonUser(user: User, options: { throwOnError?: boolean } = {}) {
   try {
+    logAuthDebug("syncNeonUser.idToken.start", describeFirebaseUser(user));
     const idToken = await user.getIdToken();
+    logAuthDebug("syncNeonUser.fetch.start", describeFirebaseUser(user));
     const response = await fetch("/api/auth/sync-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken }),
     });
+    const body = await response.json().catch(() => ({}));
+
+    logAuthDebug("syncNeonUser.fetch.done", {
+      status: response.status,
+      ok: response.ok,
+      response: summarizeSyncResponse(body),
+    });
 
     if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
       throw new Error(getApiErrorMessage(body));
     }
   } catch (error) {
+    logAuthDebug("syncNeonUser.error", describeAuthError(error));
     console.error("Failed to sync Firebase user to Neon.", error);
 
     if (options.throwOnError) {
       throw error;
     }
   }
+}
+
+function logAuthDebug(event: string, payload?: unknown) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  console.info(AUTH_LOG_PREFIX, event, payload ?? "");
+}
+
+function describeFirebaseUser(user: User | null) {
+  if (!user) {
+    return { signedIn: false };
+  }
+
+  return {
+    signedIn: true,
+    uid: maskUid(user.uid),
+    email: maskEmail(user.email ?? ""),
+    providerId: user.providerData[0]?.providerId ?? "unknown",
+    emailVerified: user.emailVerified,
+  };
+}
+
+function describeAuthError(error: unknown) {
+  if (error instanceof FirebaseError) {
+    return {
+      code: error.code,
+      message: error.message,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+
+  return {
+    message: String(error),
+  };
+}
+
+function summarizeSyncResponse(body: unknown) {
+  if (!body || typeof body !== "object") {
+    return body;
+  }
+
+  if ("user" in body && body.user && typeof body.user === "object") {
+    const user = body.user as { email?: string; role?: string; status?: string; id?: string };
+
+    return {
+      user: {
+        id: user.id ? maskUid(user.id) : undefined,
+        email: maskEmail(user.email ?? ""),
+        role: user.role,
+        status: user.status,
+      },
+    };
+  }
+
+  if ("error" in body) {
+    return body;
+  }
+
+  return body;
+}
+
+function maskEmail(email: string) {
+  if (!email || !email.includes("@")) {
+    return email || "(empty)";
+  }
+
+  const [name, domain] = email.split("@");
+  const safeName = name.length <= 2 ? `${name[0] ?? ""}*` : `${name.slice(0, 2)}***${name.slice(-1)}`;
+
+  return `${safeName}@${domain}`;
+}
+
+function maskUid(uid: string) {
+  if (!uid) {
+    return "(empty)";
+  }
+
+  if (uid.length <= 8) {
+    return `${uid.slice(0, 2)}***`;
+  }
+
+  return `${uid.slice(0, 4)}...${uid.slice(-4)}`;
 }
 
 function isMissingEmailAccountError(error: unknown) {
