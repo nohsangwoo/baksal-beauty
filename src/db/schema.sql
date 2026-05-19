@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS users (
   email text NOT NULL UNIQUE,
   phone text NOT NULL DEFAULT '',
   photo_url text NOT NULL DEFAULT '',
-  role text NOT NULL DEFAULT 'patient',
+  role text NOT NULL DEFAULT 'Patient',
   status text NOT NULL DEFAULT 'active',
   auth_provider text NOT NULL DEFAULT 'firebase',
   last_login_at timestamptz,

@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { isLocale } from "@/i18n/config";
 import { createService, getAdminServices } from "@/lib/service-repository";
+import { requireAdminUserFromRequest } from "@/lib/auth-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const auth = await requireAdminUserFromRequest(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const { searchParams } = new URL(request.url);
   const localeParam = searchParams.get("locale") ?? "ko";
   const locale = isLocale(localeParam) ? localeParam : "ko";
@@ -15,6 +22,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdminUserFromRequest(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     const id = await createService(await request.json());
     return NextResponse.json({ id }, { status: 201 });

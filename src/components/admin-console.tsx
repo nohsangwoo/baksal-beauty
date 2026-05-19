@@ -5,18 +5,13 @@ import { upload } from "@vercel/blob/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
-  FileText,
   ImagePlus,
-  Inbox,
-  LayoutDashboard,
   Loader2,
   Pencil,
   Save,
-  Scissors,
   ShieldCheck,
   Trash2,
   UploadCloud,
-  Users,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -31,8 +26,9 @@ import {
   type ServiceVideoPreview,
 } from "@/data/service-content";
 import { localeLabels, locales, type Locale } from "@/i18n/config";
+import { USER_ROLES, USER_STATUSES } from "@/lib/rbac";
 
-type AdminTab = "dashboard" | "users" | "services" | "blog" | "inquire";
+export type AdminSection = "dashboard" | "users" | "services" | "blog" | "inquire";
 
 type AdminRecord = {
   id: string;
@@ -49,14 +45,6 @@ type ListResponse<T> = {
   source: "database" | "fallback";
   items: T[];
 };
-
-const tabs: { id: AdminTab; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "users", label: "User Management", icon: Users },
-  { id: "services", label: "SERVICE", icon: Scissors },
-  { id: "blog", label: "BLOG", icon: FileText },
-  { id: "inquire", label: "INQUIRE", icon: Inbox },
-];
 
 const emptyService: Partial<ServiceItem> = {
   slug: "",
@@ -113,12 +101,12 @@ const emptyRecord: AdminRecord = {
   tags: [],
 };
 
-function getEmptyRecord(tab: Exclude<AdminTab, "dashboard" | "services">): AdminRecord {
+function getEmptyRecord(tab: Exclude<AdminSection, "dashboard" | "services">): AdminRecord {
   if (tab === "users") {
     return {
       ...emptyRecord,
       status: "active",
-      meta: "patient",
+      meta: "Patient",
       tags: ["manual"],
     };
   }
@@ -126,25 +114,36 @@ function getEmptyRecord(tab: Exclude<AdminTab, "dashboard" | "services">): Admin
   return emptyRecord;
 }
 
-export function AdminConsole({ locale }: { locale: Locale }) {
-  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
+export function AdminConsole({
+  locale,
+  section,
+  canManageUsers = false,
+}: {
+  locale: Locale;
+  section: AdminSection;
+  canManageUsers?: boolean;
+}) {
   const [serviceLocale, setServiceLocale] = useState<Locale>(locale);
   const queryClient = useQueryClient();
   const serviceQuery = useQuery({
     queryKey: ["admin-services", serviceLocale],
     queryFn: () => fetchJson<ListResponse<ServiceItem>>(`/api/admin/services?locale=${serviceLocale}`),
+    enabled: section === "dashboard" || section === "services",
   });
   const userQuery = useQuery({
     queryKey: ["admin-resource", "users"],
     queryFn: () => fetchJson<ListResponse<AdminRecord>>("/api/admin/users"),
+    enabled: canManageUsers,
   });
   const blogQuery = useQuery({
     queryKey: ["admin-resource", "blog"],
     queryFn: () => fetchJson<ListResponse<AdminRecord>>("/api/admin/blog"),
+    enabled: section === "dashboard" || section === "blog",
   });
   const inquireQuery = useQuery({
     queryKey: ["admin-resource", "inquire"],
     queryFn: () => fetchJson<ListResponse<AdminRecord>>("/api/admin/inquire"),
+    enabled: section === "dashboard" || section === "inquire",
   });
   const counts = {
     services: serviceQuery.data?.items.length ?? 0,
@@ -153,63 +152,45 @@ export function AdminConsole({ locale }: { locale: Locale }) {
     inquire: inquireQuery.data?.items.length ?? 0,
   };
 
-  return (
-    <section data-reveal-section="" className="bg-[#1f1715] py-16 md:py-24">
-      <div className="section-shell">
-        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="glass-panel h-fit p-4">
-            <div className="border-b border-white/10 p-3">
-              <p className="eyebrow text-[#dec47b]">Admin Console</p>
-              <h2 className="font-display mt-3 text-3xl">BAKSAL Ops</h2>
-              <p className="mt-3 text-sm leading-6 text-[#b6aaa6]">
-                인증 연결 전 단계의 운영 콘솔입니다. DB 연결 후 CRUD가 바로 저장됩니다.
-              </p>
-            </div>
-            <nav className="mt-4 grid gap-2">
-              {tabs.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  className={`flex items-center gap-3 rounded-md px-4 py-3 text-left text-sm font-black transition ${
-                    activeTab === id
-                      ? "bg-[#d62f55] text-white"
-                      : "text-white/68 hover:bg-white/[0.06] hover:text-[#dec47b]"
-                  }`}
-                  onClick={() => setActiveTab(id)}
-                  type="button"
-                >
-                  <Icon size={17} />
-                  {label}
-                </button>
-              ))}
-            </nav>
-          </aside>
+  if (section === "dashboard") {
+    return <DashboardPanel counts={counts} />;
+  }
 
-          <div className="min-w-0">
-            {activeTab === "dashboard" ? (
-              <DashboardPanel counts={counts} />
-            ) : activeTab === "services" ? (
-              <ServiceCrudPanel
-                locale={serviceLocale}
-                onLocaleChange={setServiceLocale}
-                items={serviceQuery.data?.items ?? []}
-                source={serviceQuery.data?.source}
-                loading={serviceQuery.isLoading}
-                onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin-services", serviceLocale] })}
-              />
-            ) : (
-              <GenericCrudPanel
-                key={activeTab}
-                tab={activeTab}
-                items={getQuery(activeTab, userQuery, blogQuery, inquireQuery).data?.items ?? []}
-                source={getQuery(activeTab, userQuery, blogQuery, inquireQuery).data?.source}
-                loading={getQuery(activeTab, userQuery, blogQuery, inquireQuery).isLoading}
-                onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin-resource", activeTab] })}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-    </section>
+  if (section === "services") {
+    return (
+      <ServiceCrudPanel
+        locale={serviceLocale}
+        onLocaleChange={setServiceLocale}
+        items={serviceQuery.data?.items ?? []}
+        source={serviceQuery.data?.source}
+        loading={serviceQuery.isLoading}
+        onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin-services", serviceLocale] })}
+      />
+    );
+  }
+
+  if (section === "users") {
+    return canManageUsers ? (
+      <UserManagementPanel
+        items={userQuery.data?.items ?? []}
+        source={userQuery.data?.source}
+        loading={userQuery.isLoading}
+        onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin-resource", "users"] })}
+      />
+    ) : (
+      <ForbiddenPanel title="User Management" />
+    );
+  }
+
+  return (
+    <GenericCrudPanel
+      key={section}
+      tab={section}
+      items={getQuery(section, userQuery, blogQuery, inquireQuery).data?.items ?? []}
+      source={getQuery(section, userQuery, blogQuery, inquireQuery).data?.source}
+      loading={getQuery(section, userQuery, blogQuery, inquireQuery).isLoading}
+      onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin-resource", section] })}
+    />
   );
 }
 
@@ -710,6 +691,156 @@ function DetailPanelEditor({
   );
 }
 
+function UserManagementPanel({
+  items,
+  source,
+  loading,
+  onChanged,
+}: {
+  items: AdminRecord[];
+  source?: "database" | "fallback";
+  loading: boolean;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState<AdminRecord>(() => getEmptyRecord("users"));
+  const [notice, setNotice] = useState("");
+  const saveMutation = useMutation({
+    mutationFn: async (payload: AdminRecord) => {
+      const method = payload.id ? "PATCH" : "POST";
+      const url = payload.id ? `/api/admin/users/${payload.id}` : "/api/admin/users";
+      return fetchJson(url, { method, body: JSON.stringify(payload) });
+    },
+    onSuccess: () => {
+      setNotice("사용자 권한이 저장되었습니다.");
+      setEditing(getEmptyRecord("users"));
+      onChanged();
+    },
+    onError: (error) => setNotice(error instanceof Error ? error.message : "사용자 저장에 실패했습니다."),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => fetchJson(`/api/admin/users/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setNotice("사용자를 삭제했습니다.");
+      onChanged();
+    },
+    onError: (error) => setNotice(error instanceof Error ? error.message : "사용자 삭제에 실패했습니다."),
+  });
+
+  return (
+    <CrudShell
+      title="User Management"
+      source={source}
+      loading={loading}
+      notice={notice}
+      action={
+        <button className="button-outline" onClick={() => setEditing(getEmptyRecord("users"))} type="button">
+          New User
+        </button>
+      }
+    >
+      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
+        <div className="grid gap-3">
+          {items.map((item) => (
+            <article key={item.id} className="glass-panel flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-[#dec47b]/14 px-3 py-1 text-[0.68rem] font-black uppercase text-[#dec47b]">
+                    {item.meta}
+                  </span>
+                  <span className="rounded-full bg-white/8 px-3 py-1 text-[0.68rem] font-black uppercase text-white/64">
+                    {item.status}
+                  </span>
+                </div>
+                <h4 className="mt-3 truncate text-xl font-black">{item.title || item.subtitle}</h4>
+                <p className="mt-2 truncate text-sm leading-6 text-[#d9d0c9]">{item.subtitle}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="button-outline h-10 px-3 text-[0.68rem]"
+                  onClick={() => saveMutation.mutate({ ...item, meta: "Patient" })}
+                  type="button"
+                >
+                  Revoke
+                </button>
+                <button className="social-action-button" onClick={() => setEditing(item)} title="Edit" type="button">
+                  <Pencil size={16} />
+                </button>
+                <button className="social-action-button" onClick={() => deleteMutation.mutate(item.id)} title="Delete" type="button">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <form
+          className="glass-panel h-fit p-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            saveMutation.mutate(editing);
+          }}
+        >
+          <p className="eyebrow text-[#dec47b]">RBAC Editor</p>
+          <p className="mt-3 text-sm leading-6 text-[#b6aaa6]">
+            Firebase 계정의 신원은 유지하고, Neon users 테이블에서 앱 권한만 부여하거나 철회합니다.
+          </p>
+          <div className="mt-5 grid gap-3">
+            <Field label="Name" value={editing.title} onChange={(value) => setEditing({ ...editing, title: value })} />
+            <Textarea label="Email" value={editing.subtitle} onChange={(value) => setEditing({ ...editing, subtitle: value })} />
+            <Select
+              label="Role"
+              value={editing.meta || "Patient"}
+              options={[...USER_ROLES]}
+              onChange={(value) => setEditing({ ...editing, meta: value })}
+            />
+            <Select
+              label="Status"
+              value={editing.status || "active"}
+              options={[...USER_STATUSES]}
+              onChange={(value) => setEditing({ ...editing, status: value })}
+            />
+            <Field
+              label="Auth Provider"
+              value={(editing.tags ?? ["manual"])[0] ?? "manual"}
+              onChange={(value) => setEditing({ ...editing, tags: [value] })}
+            />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button className="button-outline h-10 px-3 text-[0.68rem]" onClick={() => setEditing({ ...editing, meta: "Admin" })} type="button">
+              Grant Admin
+            </button>
+            <button className="button-outline h-10 px-3 text-[0.68rem]" onClick={() => setEditing({ ...editing, meta: "Owner" })} type="button">
+              Grant Owner
+            </button>
+            <button className="button-outline h-10 px-3 text-[0.68rem]" onClick={() => setEditing({ ...editing, meta: "Patient" })} type="button">
+              Revoke Role
+            </button>
+            <button className="button-outline h-10 px-3 text-[0.68rem]" onClick={() => setEditing({ ...editing, status: "suspended" })} type="button">
+              Suspend
+            </button>
+          </div>
+          <button className="button-primary mt-5 w-full" disabled={saveMutation.isPending} type="submit">
+            {saveMutation.isPending ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />}
+            Save Permission
+          </button>
+        </form>
+      </div>
+    </CrudShell>
+  );
+}
+
+function ForbiddenPanel({ title }: { title: string }) {
+  return (
+    <div className="glass-panel p-7 md:p-9">
+      <p className="eyebrow text-[#dec47b]">{title}</p>
+      <h3 className="font-display mt-3 text-5xl">Owner only</h3>
+      <p className="mt-5 max-w-2xl leading-8 text-[#d9d0c9]">
+        사용자 권한 부여와 철회는 최고관리자 권한을 가진 계정만 수행할 수 있습니다.
+      </p>
+    </div>
+  );
+}
+
 function GenericCrudPanel({
   tab,
   items,
@@ -717,7 +848,7 @@ function GenericCrudPanel({
   loading,
   onChanged,
 }: {
-  tab: Exclude<AdminTab, "dashboard" | "services">;
+  tab: Exclude<AdminSection, "dashboard" | "services">;
   items: AdminRecord[];
   source?: "database" | "fallback";
   loading: boolean;
@@ -969,7 +1100,7 @@ function UploadField({
 }
 
 function getQuery(
-  tab: AdminTab,
+  tab: AdminSection,
   users: ReturnType<typeof useQuery<ListResponse<AdminRecord>>>,
   blog: ReturnType<typeof useQuery<ListResponse<AdminRecord>>>,
   inquire: ReturnType<typeof useQuery<ListResponse<AdminRecord>>>,
@@ -988,6 +1119,7 @@ function getQuery(
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
+    credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),

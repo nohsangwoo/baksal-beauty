@@ -8,7 +8,7 @@ type PageProps = {
   params: Promise<{ locale: string }>;
 };
 
-export default async function AdminDashboardPage({ params }: PageProps) {
+export default async function AdminUsersPage({ params }: PageProps) {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
@@ -20,7 +20,7 @@ export default async function AdminDashboardPage({ params }: PageProps) {
   return (
     <AdminConsole
       locale={locale}
-      section="dashboard"
+      section="users"
       canManageUsers={canManageUsers(currentUser)}
     />
   );

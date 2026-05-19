@@ -93,7 +93,7 @@ export const users = pgTable(
     email: text("email").notNull().unique(),
     phone: text("phone").notNull().default(""),
     photoUrl: text("photo_url").notNull().default(""),
-    role: text("role").notNull().default("patient"),
+    role: text("role").notNull().default("Patient"),
     status: text("status").notNull().default("active"),
     authProvider: text("auth_provider").notNull().default("firebase"),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "string" }),

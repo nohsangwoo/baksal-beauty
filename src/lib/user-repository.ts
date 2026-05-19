@@ -30,7 +30,7 @@ export async function upsertFirebaseUser(profile: FirebaseUserProfile) {
       email: normalizedEmail,
       phone: profile.phone?.trim() ?? "",
       photoUrl,
-      role: "patient",
+      role: "Patient",
       status: "active",
       authProvider: profile.authProvider || "firebase",
       lastLoginAt: sql`now()`,

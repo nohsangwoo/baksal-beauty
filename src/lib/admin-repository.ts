@@ -1,7 +1,8 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { adminUserSeeds, blogPostSeeds, inquirySeeds } from "@/data/admin-seed";
 import { blogPosts, inquiries, users } from "@/db/schema";
 import { getDb, hasDatabaseConnection } from "@/lib/db";
+import { normalizeRole, normalizeStatus } from "@/lib/rbac";
 
 export type AdminResource = "users" | "blog" | "inquire";
 
@@ -134,13 +135,21 @@ export async function createAdminRecord(resource: AdminResource, body: Record<st
   const db = getDb();
 
   if (resource === "users") {
+    const email = String(body.subtitle ?? "").trim().toLowerCase();
+    const role = normalizeRole(body.meta ?? "Patient");
+    const status = normalizeStatus(body.status ?? "active");
+
+    if (!email) {
+      throw new Error("Email is required.");
+    }
+
     const [created] = await db
       .insert(users)
       .values({
         name: String(body.title ?? ""),
-        email: String(body.subtitle ?? "").trim().toLowerCase(),
-        role: String(body.meta ?? "Editor"),
-        status: String(body.status ?? "active"),
+        email,
+        role,
+        status,
         authProvider: normalizeTags(body.tags)[0] ?? "manual",
       })
       .returning({ id: users.id });
@@ -190,13 +199,17 @@ export async function updateAdminRecord(
   const db = getDb();
 
   if (resource === "users") {
+    const nextRole = normalizeRole(body.meta ?? "Patient");
+    const nextStatus = normalizeStatus(body.status ?? "active");
+    await assertOwnerContinuity(id, nextRole, nextStatus);
+
     await db
       .update(users)
       .set({
         name: String(body.title ?? ""),
         email: String(body.subtitle ?? "").trim().toLowerCase(),
-        role: String(body.meta ?? "Editor"),
-        status: String(body.status ?? "active"),
+        role: nextRole,
+        status: nextStatus,
         authProvider: normalizeTags(body.tags)[0] ?? "manual",
         updatedAt: sql`now()`,
       })
@@ -238,6 +251,7 @@ export async function deleteAdminRecord(resource: AdminResource, id: string) {
   const db = getDb();
 
   if (resource === "users") {
+    await assertOwnerContinuity(id, "Patient", "suspended");
     await db.delete(users).where(eq(users.id, id));
     return;
   }
@@ -278,4 +292,34 @@ function slugify(value: string) {
     .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+}
+
+async function assertOwnerContinuity(userId: string, nextRole: string, nextStatus: string) {
+  const [current] = await getDb()
+    .select({
+      role: users.role,
+      status: users.status,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!current || current.role !== "Owner" || current.status !== "active") {
+    return;
+  }
+
+  const remainsActiveOwner = nextRole === "Owner" && nextStatus === "active";
+
+  if (remainsActiveOwner) {
+    return;
+  }
+
+  const [row] = await getDb()
+    .select({ count: sql<number>`count(*)::int` })
+    .from(users)
+    .where(and(eq(users.role, "Owner"), eq(users.status, "active"), sql`${users.id} <> ${userId}`));
+
+  if (Number(row?.count ?? 0) === 0) {
+    throw new Error("At least one active Owner must remain.");
+  }
 }

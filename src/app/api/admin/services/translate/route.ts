@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isLocale, type Locale } from "@/i18n/config";
 import { getAdminServiceById } from "@/lib/service-repository";
+import { requireAdminUserFromRequest } from "@/lib/auth-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,12 @@ const localeNames: Record<Locale, string> = {
 };
 
 export async function POST(request: Request) {
+  const auth = await requireAdminUserFromRequest(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     const body = (await request.json()) as {
       serviceId?: string;

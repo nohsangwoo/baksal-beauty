@@ -5,6 +5,7 @@ import {
   createUserWithEmailAndPassword,
   getRedirectResult,
   GoogleAuthProvider,
+  onIdTokenChanged,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -129,7 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (nextUser) {
         logAuthDebug("onAuthStateChanged.sync.start", describeFirebaseUser(nextUser));
-        void syncNeonUser(nextUser);
+        void syncNeonUser(nextUser)
+          .then(() => syncAuthSession(nextUser))
+          .catch((error) => logAuthDebug("onAuthStateChanged.session.error", describeAuthError(error)));
       }
     });
 
@@ -143,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (result?.user) {
           await syncNeonUser(result.user, { throwOnError: true });
+          await syncAuthSession(result.user);
           setAuthNotice({
             message: "Google 로그인과 회원 정보 저장이 완료되었습니다.",
             tone: "success",
@@ -160,6 +164,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const auth = getFirebaseAuth();
+
+    return onIdTokenChanged(auth, async (nextUser) => {
+      logAuthDebug("onIdTokenChanged", describeFirebaseUser(nextUser));
+
+      if (!nextUser) {
+        await clearAuthSession();
+        return;
+      }
+
+      try {
+        await syncAuthSession(nextUser);
+        logAuthDebug("authSession.set", describeFirebaseUser(nextUser));
+      } catch (error) {
+        await clearAuthSession();
+        logAuthDebug("authSession.error", describeAuthError(error));
+      }
+    });
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -201,6 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           await syncNeonUserWithNotice(credential.user, setAuthNotice);
+          await syncAuthSession(credential.user);
           setAuthNotice({
             message: "가입되지 않은 이메일이라 새 계정을 만들고 회원 정보 저장까지 완료했습니다.",
             tone: "success",
@@ -209,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         await syncNeonUserWithNotice(credential.user, setAuthNotice);
+        await syncAuthSession(credential.user);
         setAuthNotice({
           message: "로그인과 회원 정보 저장이 완료되었습니다.",
           tone: "success",
@@ -239,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credential = await signInWithEmailAndPassword(getFirebaseAuth(), normalizedEmail, password);
           logAuthDebug("registerWithEmail.firebase.emailExists.signIn.success", describeFirebaseUser(credential.user));
           await syncNeonUserWithNotice(credential.user, setAuthNotice);
+          await syncAuthSession(credential.user);
           setAuthNotice({
             message: "이미 가입된 이메일이라 기존 계정으로 로그인하고 회원 정보 저장까지 완료했습니다.",
             tone: "success",
@@ -254,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         await syncNeonUserWithNotice(credential.user, setAuthNotice);
+        await syncAuthSession(credential.user);
         setAuthNotice({
           message: "회원가입이 완료되었습니다. Firebase와 Neon DB에 회원 정보가 저장되었습니다.",
           tone: "success",
@@ -275,6 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const credential = await signInWithPopup(getFirebaseAuth(), provider);
           logAuthDebug("loginWithGoogle.popup.success", describeFirebaseUser(credential.user));
           await syncNeonUserWithNotice(credential.user, setAuthNotice);
+          await syncAuthSession(credential.user);
           setAuthNotice({
             message: "Google 로그인과 회원 정보 저장이 완료되었습니다.",
             tone: "success",
@@ -299,6 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
       async logout() {
+        await clearAuthSession();
         await signOut(getFirebaseAuth());
       },
       redirectError,
@@ -408,6 +439,33 @@ function sendAuthDebugLog(event: string, payload?: unknown) {
     body,
     keepalive: true,
   }).catch(() => {});
+}
+
+async function syncAuthSession(user: User) {
+  const idToken = await user.getIdToken();
+  const response = await fetch("/api/auth/session", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+  const body = await response.json().catch(() => ({}));
+
+  logAuthDebug("syncAuthSession.done", {
+    status: response.status,
+    ok: response.ok,
+    response: summarizeSyncResponse(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(body));
+  }
+}
+
+async function clearAuthSession() {
+  await fetch("/api/auth/session", {
+    method: "DELETE",
+  }).catch((error) => {
+    logAuthDebug("clearAuthSession.error", describeAuthError(error));
+  });
 }
 
 function describeFirebaseUser(user: User | null) {

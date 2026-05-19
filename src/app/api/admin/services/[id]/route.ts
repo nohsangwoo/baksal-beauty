@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteService, updateService } from "@/lib/service-repository";
+import { requireAdminUserFromRequest } from "@/lib/auth-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +10,12 @@ type RouteContext = {
 };
 
 export async function PATCH(request: Request, context: RouteContext) {
+  const auth = await requireAdminUserFromRequest(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const { id } = await context.params;
 
   try {
@@ -22,7 +29,13 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
+  const auth = await requireAdminUserFromRequest(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const { id } = await context.params;
 
   try {

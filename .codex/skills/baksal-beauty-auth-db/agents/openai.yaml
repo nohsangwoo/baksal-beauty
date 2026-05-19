@@ -1,0 +1,4 @@
+interface:
+  display_name: "BAKSAL Auth DB"
+  short_description: "Firebase auth and Neon user DB rules"
+  default_prompt: "Use $baksal-beauty-auth-db when editing BAKSAL Beauty login, user sync, RBAC, or Neon/Drizzle schema."

@@ -4,6 +4,7 @@ import {
   isAdminResource,
   updateAdminRecord,
 } from "@/lib/admin-repository";
+import { requireAdminUserFromRequest } from "@/lib/auth-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unknown admin resource." }, { status: 404 });
   }
 
+  const auth = await requireAdminUserFromRequest(request, { ownerOnly: resource === "users" });
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     await updateAdminRecord(resource, id, await request.json());
     return NextResponse.json({ id });
@@ -30,11 +37,17 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   const { resource, id } = await context.params;
 
   if (!isAdminResource(resource)) {
     return NextResponse.json({ error: "Unknown admin resource." }, { status: 404 });
+  }
+
+  const auth = await requireAdminUserFromRequest(request, { ownerOnly: resource === "users" });
+
+  if (auth.response) {
+    return auth.response;
   }
 
   try {
