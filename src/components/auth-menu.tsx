@@ -307,6 +307,8 @@ function AuthDialog({
 
     try {
       await loginWithGoogle();
+      logAuthUi("dialog.google.success", { path: window.location.pathname });
+      onClose();
     } catch (caught) {
       logAuthUi("dialog.google.error", { error: getAuthErrorDebug(caught) });
       setError(getAuthErrorMessage(caught));

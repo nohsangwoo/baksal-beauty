@@ -7,6 +7,7 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   signOut,
   updateProfile,
@@ -261,15 +262,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async loginWithGoogle() {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
-        logAuthDebug("loginWithGoogle.redirect.start", {
+        logAuthDebug("loginWithGoogle.popup.start", {
           path: window.location.pathname,
           host: window.location.host,
         });
         setAuthNotice({
-          message: "Google 로그인 화면으로 이동합니다.",
+          message: "Google 로그인 창을 여는 중입니다.",
           tone: "info",
         });
-        await signInWithRedirect(getFirebaseAuth(), provider);
+
+        try {
+          const credential = await signInWithPopup(getFirebaseAuth(), provider);
+          logAuthDebug("loginWithGoogle.popup.success", describeFirebaseUser(credential.user));
+          await syncNeonUserWithNotice(credential.user, setAuthNotice);
+          setAuthNotice({
+            message: "Google 로그인과 회원 정보 저장이 완료되었습니다.",
+            tone: "success",
+          });
+        } catch (error) {
+          logAuthDebug("loginWithGoogle.popup.error", describeAuthError(error));
+
+          if (!shouldFallbackToRedirect(error)) {
+            throw error;
+          }
+
+          logAuthDebug("loginWithGoogle.redirect.fallback.start", {
+            path: window.location.pathname,
+            host: window.location.host,
+            reason: describeAuthError(error),
+          });
+          setAuthNotice({
+            message: "팝업이 차단되어 Google 로그인 화면으로 이동합니다.",
+            tone: "info",
+          });
+          await signInWithRedirect(getFirebaseAuth(), provider);
+        }
       },
       async logout() {
         await signOut(getFirebaseAuth());
@@ -474,6 +501,13 @@ function isMissingEmailAccountError(error: unknown) {
 
 function isEmailAlreadyInUseError(error: unknown) {
   return error instanceof FirebaseError && error.code === "auth/email-already-in-use";
+}
+
+function shouldFallbackToRedirect(error: unknown) {
+  return (
+    error instanceof FirebaseError &&
+    (error.code === "auth/popup-blocked" || error.code === "auth/cancelled-popup-request")
+  );
 }
 
 function getApiErrorMessage(body: unknown) {
