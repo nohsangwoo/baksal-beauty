@@ -1,5 +1,6 @@
 "use client";
 
+import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   getRedirectResult,
@@ -10,6 +11,7 @@ import {
   signOut,
   updateProfile,
   type User,
+  type UserCredential,
 } from "firebase/auth";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getFirebaseAuth } from "@/lib/firebase-client";
@@ -95,7 +97,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       async loginWithEmail(email, password) {
-        const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+        let credential: UserCredential;
+
+        try {
+          credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+        } catch (error) {
+          if (!isMissingEmailAccountError(error)) {
+            throw error;
+          }
+
+          try {
+            credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+          } catch (createError) {
+            if (isEmailAlreadyInUseError(createError)) {
+              throw error;
+            }
+
+            throw createError;
+          }
+
+          await syncNeonUserWithNotice(credential.user, setAuthNotice);
+          setAuthNotice({
+            message: "가입되지 않은 이메일이라 새 계정을 만들고 회원 정보 저장까지 완료했습니다.",
+            tone: "success",
+          });
+          return;
+        }
+
         await syncNeonUserWithNotice(credential.user, setAuthNotice);
         setAuthNotice({
           message: "로그인과 회원 정보 저장이 완료되었습니다.",
@@ -195,6 +223,17 @@ async function syncNeonUser(user: User, options: { throwOnError?: boolean } = {}
       throw error;
     }
   }
+}
+
+function isMissingEmailAccountError(error: unknown) {
+  return (
+    error instanceof FirebaseError &&
+    (error.code === "auth/user-not-found" || error.code === "auth/invalid-credential")
+  );
+}
+
+function isEmailAlreadyInUseError(error: unknown) {
+  return error instanceof FirebaseError && error.code === "auth/email-already-in-use";
 }
 
 function getApiErrorMessage(body: unknown) {

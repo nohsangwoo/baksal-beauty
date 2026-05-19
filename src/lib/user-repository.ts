@@ -40,8 +40,8 @@ export async function upsertFirebaseUser(profile: FirebaseUserProfile) {
       set: {
         firebaseUid: profile.firebaseUid,
         name: sql`COALESCE(NULLIF(EXCLUDED.name, ''), ${users.name})`,
-        phone: profile.phone?.trim() ?? "",
-        photoUrl,
+        phone: sql`COALESCE(NULLIF(EXCLUDED.phone, ''), ${users.phone})`,
+        photoUrl: sql`COALESCE(NULLIF(EXCLUDED.photo_url, ''), ${users.photoUrl})`,
         authProvider: profile.authProvider || "firebase",
         lastLoginAt: sql`now()`,
         updatedAt: sql`now()`,
