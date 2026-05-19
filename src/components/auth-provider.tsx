@@ -131,7 +131,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       },
       async registerWithEmail(email, password, displayName) {
-        const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+        let credential: UserCredential;
+
+        try {
+          credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+        } catch (error) {
+          if (!isEmailAlreadyInUseError(error)) {
+            throw error;
+          }
+
+          credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+          await syncNeonUserWithNotice(credential.user, setAuthNotice);
+          setAuthNotice({
+            message: "이미 가입된 이메일이라 기존 계정으로 로그인하고 회원 정보 저장까지 완료했습니다.",
+            tone: "success",
+          });
+          return;
+        }
 
         if (displayName?.trim()) {
           await updateProfile(credential.user, { displayName: displayName.trim() });
