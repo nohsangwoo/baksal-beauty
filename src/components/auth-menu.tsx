@@ -254,24 +254,47 @@ function AuthDialog({
       path: window.location.pathname,
     });
 
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
+      logAuthUi("dialog.form.validation.error", {
+        reason: "missing-required-fields",
+        hasEmail: Boolean(normalizedEmail),
+        hasPassword: Boolean(password),
+      });
+      setError("이메일과 비밀번호를 입력해주세요.");
+      setBusy(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      logAuthUi("dialog.form.validation.error", {
+        reason: "password-too-short",
+        passwordLength: password.length,
+      });
+      setError("비밀번호는 6자 이상으로 입력해주세요.");
+      setBusy(false);
+      return;
+    }
+
     try {
       if (mode === "login") {
-        await loginWithEmail(email, password);
+        await loginWithEmail(normalizedEmail, password);
       } else {
-        await registerWithEmail(email, password, displayName);
+        await registerWithEmail(normalizedEmail, password, displayName);
       }
 
-      logAuthUi("dialog.form.success", { mode, email: maskEmail(email) });
+      logAuthUi("dialog.form.success", { mode, email: maskEmail(normalizedEmail) });
       onClose();
     } catch (caught) {
       logAuthUi("dialog.form.error", {
         mode,
-        email: maskEmail(email),
+        email: maskEmail(normalizedEmail),
         error: getAuthErrorDebug(caught),
       });
       setError(getAuthErrorMessage(caught));
     } finally {
-      logAuthUi("dialog.form.finally", { mode, email: maskEmail(email) });
+      logAuthUi("dialog.form.finally", { mode, email: maskEmail(normalizedEmail) });
       setBusy(false);
     }
   }
@@ -338,7 +361,7 @@ function AuthDialog({
           {copy.google}
         </button>
 
-        <form className="mt-4 grid gap-3" onSubmit={handleSubmit}>
+        <form className="mt-4 grid gap-3" noValidate onSubmit={handleSubmit}>
           {mode === "register" ? (
             <label className="grid gap-2 text-xs font-black uppercase text-white/72">
               {copy.name}
