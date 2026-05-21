@@ -63,7 +63,7 @@ export const inquirySeeds: InquirySeed[] = [
     phone: "010-0000-0000",
     email: "guest@example.com",
     interest: "눈성형",
-    preferredChannel: "KakaoTalk",
+    preferredChannel: "이메일",
     message: "눈성형 상담 가능 일정 문의",
     status: "new",
   },

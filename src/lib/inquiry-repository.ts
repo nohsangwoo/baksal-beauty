@@ -1,5 +1,6 @@
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import {
+  inquiryAttachments,
   inquiries,
   inquiryReplies,
 } from "@/db/schema";
@@ -8,6 +9,7 @@ import {
   inquiryStatuses,
   unansweredInquiryStatuses,
   type InquiryListResult,
+  type InquiryAttachment,
   type InquiryHistoryItem,
   type InquiryRecord,
   type InquiryReply,
@@ -31,6 +33,23 @@ type CreateInquiryInput = {
   locale?: unknown;
   privacyAccepted?: unknown;
   sourcePath?: unknown;
+  attachments?: unknown;
+};
+
+type CreateInquiryAttachmentInput = {
+  fileName?: unknown;
+  fileType?: unknown;
+  fileSize?: unknown;
+  url?: unknown;
+  pathname?: unknown;
+};
+
+type NormalizedInquiryAttachmentInput = {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  url: string;
+  pathname: string;
 };
 
 type ListInquiryOptions = {
@@ -58,6 +77,7 @@ export async function createInquiry(input: CreateInquiryInput) {
   const phone = String(input.phone ?? "").trim();
   const email = String(input.email ?? "").trim().toLowerCase();
   const message = String(input.message ?? "").trim();
+  const preferredChannel = normalizePreferredChannel(input.preferredChannel);
   const privacyAccepted = Boolean(input.privacyAccepted);
 
   if (!name) {
@@ -87,8 +107,8 @@ export async function createInquiry(input: CreateInquiryInput) {
       phone,
       email,
       interest: String(input.interest ?? "").trim(),
-      preferredChannel: String(input.preferredChannel ?? "email").trim() || "email",
-      subject: String(input.subject ?? "").trim() || "상담 문의",
+      preferredChannel,
+      subject: String(input.subject ?? "").trim() || "홈페이지 제작 문의",
       message,
       locale: String(input.locale ?? "ko").trim() || "ko",
       privacyAccepted,
@@ -96,6 +116,21 @@ export async function createInquiry(input: CreateInquiryInput) {
       status: "new",
     })
     .returning({ id: inquiries.id });
+
+  const attachments = normalizeAttachments(input.attachments);
+
+  if (created?.id && attachments.length) {
+    await getDb().insert(inquiryAttachments).values(
+      attachments.map((attachment) => ({
+        inquiryId: created.id,
+        fileName: attachment.fileName,
+        fileType: attachment.fileType,
+        fileSize: attachment.fileSize,
+        url: attachment.url,
+        pathname: attachment.pathname,
+      })),
+    );
+  }
 
   return created?.id;
 }
@@ -146,12 +181,15 @@ export async function listInquiries(options: ListInquiryOptions = {}): Promise<I
       .where(whereClause);
 
     const replies = await listRepliesForInquiryIds(rows.map((item) => item.id));
+    const attachments = await listAttachmentsForInquiryIds(rows.map((item) => item.id));
     const histories = await listHistoryForInquiryEmails(rows.map((item) => item.email));
     const counts = await getInquiryCounts();
 
     return {
       source: "database",
-      items: rows.map((row) => hydrateInquiry(row, replies[row.id] ?? [], histories[row.email] ?? [])),
+      items: rows.map((row) =>
+        hydrateInquiry(row, replies[row.id] ?? [], attachments[row.id] ?? [], histories[row.email] ?? []),
+      ),
       total: Number(totalRow?.count ?? 0),
       page,
       pageSize,
@@ -161,6 +199,35 @@ export async function listInquiries(options: ListInquiryOptions = {}): Promise<I
     console.error("Failed to list inquiries", error);
     return filterFallback(options);
   }
+}
+
+async function listAttachmentsForInquiryIds(ids: string[]) {
+  if (!ids.length) {
+    return {} as Record<string, InquiryAttachment[]>;
+  }
+
+  const rows = await getDb()
+    .select({
+      id: inquiryAttachments.id,
+      inquiryId: inquiryAttachments.inquiryId,
+      fileName: inquiryAttachments.fileName,
+      fileType: inquiryAttachments.fileType,
+      fileSize: inquiryAttachments.fileSize,
+      url: inquiryAttachments.url,
+      pathname: inquiryAttachments.pathname,
+      createdAt: inquiryAttachments.createdAt,
+    })
+    .from(inquiryAttachments)
+    .where(inArray(inquiryAttachments.inquiryId, ids))
+    .orderBy(desc(inquiryAttachments.createdAt));
+
+  return rows.reduce(
+    (acc, row) => {
+      acc[row.inquiryId] = [...(acc[row.inquiryId] ?? []), row];
+      return acc;
+    },
+    {} as Record<string, InquiryAttachment[]>,
+  );
 }
 
 export async function updateInquiry(id: string, input: UpdateInquiryInput) {
@@ -392,11 +459,12 @@ function buildInquiryConditions(options: ListInquiryOptions) {
 }
 
 function hydrateInquiry(
-  row: Omit<InquiryRecord, "replyCount" | "latestReplyAt" | "replies" | "customerHistory"> & {
+  row: Omit<InquiryRecord, "replyCount" | "latestReplyAt" | "replies" | "attachments" | "customerHistory"> & {
     replyCount: number;
     latestReplyAt: string | null;
   },
   replies: InquiryReply[],
+  attachments: InquiryAttachment[],
   customerHistory: InquiryHistoryItem[],
 ): InquiryRecord {
   return {
@@ -404,8 +472,37 @@ function hydrateInquiry(
     replyCount: Number(row.replyCount ?? replies.length),
     latestReplyAt: row.latestReplyAt,
     replies,
+    attachments,
     customerHistory,
   };
+}
+
+function normalizeAttachments(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as NormalizedInquiryAttachmentInput[];
+  }
+
+  return value
+    .map((item) => item as CreateInquiryAttachmentInput)
+    .map((item) => ({
+      fileName: String(item.fileName ?? "").trim(),
+      fileType: String(item.fileType ?? "").trim(),
+      fileSize: Math.max(0, Number(item.fileSize ?? 0) || 0),
+      url: String(item.url ?? "").trim(),
+      pathname: String(item.pathname ?? "").trim(),
+    }))
+    .filter((item) => item.fileName && item.url);
+}
+
+function normalizePreferredChannel(value: unknown) {
+  const channel = String(value ?? "email").trim();
+  const allowed = new Set(["email", "Email", "이메일", "电话", "電話", "phone", "Phone", "전화"]);
+
+  if (allowed.has(channel)) {
+    return channel;
+  }
+
+  return "email";
 }
 
 function normalizeInquiryStatus(value: unknown): InquiryStatus {

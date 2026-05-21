@@ -342,6 +342,15 @@ textarea {
   color: rgba(255, 248, 239, 0.58);
 }
 
+.form-field option {
+    background: #1f1715;
+    color: #fff8ef;
+  }
+
+  select.form-field {
+    color-scheme: dark;
+  }
+
 .social-action-button,
 .floating-action-button {
   align-items: center;

@@ -169,7 +169,7 @@ export const inquiries = pgTable(
     phone: text("phone").notNull().default(""),
     email: text("email").notNull().default(""),
     interest: text("interest").notNull().default(""),
-    preferredChannel: text("preferred_channel").notNull().default("phone"),
+    preferredChannel: text("preferred_channel").notNull().default("email"),
     subject: text("subject").notNull().default(""),
     message: text("message").notNull().default(""),
     status: text("status").$type<InquiryStatus>().notNull().default("new"),
@@ -206,5 +206,24 @@ export const inquiryReplies = pgTable(
   },
   (table) => [
     index("inquiry_replies_inquiry_created_idx").on(table.inquiryId, table.createdAt),
+  ],
+);
+
+export const inquiryAttachments = pgTable(
+  "inquiry_attachments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    inquiryId: uuid("inquiry_id")
+      .notNull()
+      .references(() => inquiries.id, { onDelete: "cascade" }),
+    fileName: text("file_name").notNull().default(""),
+    fileType: text("file_type").notNull().default(""),
+    fileSize: integer("file_size").notNull().default(0),
+    url: text("url").notNull().default(""),
+    pathname: text("pathname").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("inquiry_attachments_inquiry_created_idx").on(table.inquiryId, table.createdAt),
   ],
 );

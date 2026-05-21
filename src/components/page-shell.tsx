@@ -33,7 +33,7 @@ export function PageShell({
     <main className="min-h-screen overflow-hidden bg-[#1f1715] text-[#fff8ef]">
       <SiteHeader key={locale} t={t} locale={locale} />
       <PageMotion />
-      <FloatingContactActions />
+      <FloatingContactActions inquiryCopy={t.consultation} locale={locale} />
       <section
         data-reveal-section=""
         className="relative grid min-h-[62svh] items-center overflow-hidden border-b border-white/10 py-28 pt-36 md:min-h-[72svh] md:py-36 md:pt-40"

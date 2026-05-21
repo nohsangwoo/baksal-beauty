@@ -183,7 +183,7 @@ export async function createAdminRecord(resource: AdminResource, body: Record<st
       phone: String(body.phone ?? ""),
       email: String(body.email ?? ""),
       interest: String(body.meta ?? ""),
-      preferredChannel: normalizeTags(body.tags)[0] ?? "phone",
+      preferredChannel: normalizeInquiryChannel(normalizeTags(body.tags)[0]),
       message: String(body.subtitle ?? ""),
       subject: String(body.subject ?? body.meta ?? "상담 문의"),
       status: normalizeInquiryStatus(body.status),
@@ -245,7 +245,7 @@ export async function updateAdminRecord(
       message: String(body.subtitle ?? ""),
       interest: String(body.meta ?? ""),
       status: normalizeInquiryStatus(body.status),
-      preferredChannel: normalizeTags(body.tags)[0] ?? "phone",
+      preferredChannel: normalizeInquiryChannel(normalizeTags(body.tags)[0]),
       updatedAt: sql`now()`,
     })
     .where(eq(inquiries.id, id));
@@ -296,6 +296,13 @@ function normalizeBlogStatus(value: unknown): BlogStatus {
 
 function normalizeInquiryStatus(value: unknown): InquiryStatus {
   return inquiryStatuses.includes(value as InquiryStatus) ? (value as InquiryStatus) : "new";
+}
+
+function normalizeInquiryChannel(value: unknown) {
+  const channel = String(value ?? "email").trim();
+  const allowed = new Set(["email", "Email", "이메일", "电话", "電話", "phone", "Phone", "전화"]);
+
+  return allowed.has(channel) ? channel : "email";
 }
 
 function slugify(value: string) {

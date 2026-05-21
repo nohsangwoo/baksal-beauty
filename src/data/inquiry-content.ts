@@ -15,6 +15,17 @@ export type InquiryReply = {
   createdAt: string;
 };
 
+export type InquiryAttachment = {
+  id: string;
+  inquiryId: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  url: string;
+  pathname: string;
+  createdAt: string;
+};
+
 export type InquiryHistoryItem = {
   id: string;
   subject: string;
@@ -44,6 +55,7 @@ export type InquiryRecord = {
   replyCount: number;
   latestReplyAt: string | null;
   replies: InquiryReply[];
+  attachments: InquiryAttachment[];
   customerHistory: InquiryHistoryItem[];
 };
 
@@ -73,7 +85,7 @@ export const inquiryFallbackRecords: InquiryRecord[] = [
     phone: "010-0000-0000",
     email: "guest@example.com",
     interest: "눈성형",
-    preferredChannel: "KakaoTalk",
+    preferredChannel: "이메일",
     subject: "눈매 상담 가능 일정 문의",
     message: "눈매 교정 상담 가능 일정과 회복 안내를 받고 싶습니다.",
     status: "new",
@@ -88,6 +100,7 @@ export const inquiryFallbackRecords: InquiryRecord[] = [
     replyCount: 0,
     latestReplyAt: null,
     replies: [],
+    attachments: [],
     customerHistory: [],
   },
 ];

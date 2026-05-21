@@ -62,6 +62,7 @@ Google:
 - If the server guard renders a denied state but Firebase is still signed in on the client, `AdminDenied` refreshes the Neon sync + session cookie once and then calls `router.refresh()` before showing a final denial. This prevents intermittent admin lockouts caused by an expired/missing SSR cookie.
 - Admin APIs must call `requireAdminUserFromRequest`; user-management APIs must pass `ownerOnly: true`.
 - Admin pages are split by route: `/admin`, `/admin/users`, `/admin/services`, `/admin/blog`, `/admin/inquire`.
+- Public demo admin lives at `/[locale]/testadmin`. It is intentionally front-end only, uses a hard-coded demo login, stores mock state in React, has `robots: noindex`, and must never import real admin panels, repositories, RBAC helpers, Firebase auth, Neon data, upload APIs, or `/api/admin/*` fetches.
 
 ## Drizzle and DB Changes
 
@@ -78,11 +79,12 @@ Google:
 ## Inquiry Management
 
 - Public inquiries are stored in `public.inquiries`; admin email replies are stored in `public.inquiry_replies`.
-- Public submission endpoint is `src/app/api/inquiries/route.ts`; it validates name, phone, email, message, consent, locale, and source path.
+- Inquiry attachments are stored in `public.inquiry_attachments`; files are uploaded through server-side Vercel Blob writes and only Blob URLs/pathnames are persisted in Neon.
+- Public submission endpoint is `src/app/api/inquiries/route.ts`; it accepts JSON or `multipart/form-data`, validates name, phone, email, message, consent, locale, source path, and attachment limits/types.
 - Admin inquiry list/status endpoint is `src/app/api/admin/inquiries/route.ts` and `src/app/api/admin/inquiries/[id]/route.ts`.
 - Admin email reply endpoint is `src/app/api/admin/inquiries/[id]/reply/route.ts`; it must call `requireAdminUserFromRequest` before sending mail.
 - Gmail SMTP credentials are read from `GMAIL_USER` and `GMAIL_APP_PASSWORD` through `src/lib/email.ts`; never expose these values to the client.
-- Inquiry admin UI lives in `src/app/[locale]/admin/inquire/inquire-admin-panel.tsx` and should support search, status filters, unanswered view, pagination, status assignment, reply history, and answer-complete state.
+- Inquiry admin UI lives in `src/app/[locale]/admin/inquire/inquire-admin-panel.tsx` and should support search, status filters, unanswered view, pagination, status assignment, reply history, attachment preview/download, and answer-complete state.
 
 ## Debugging Checklist
 

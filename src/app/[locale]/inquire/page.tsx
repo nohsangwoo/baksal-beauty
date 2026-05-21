@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${t.nav[3]?.label ?? "Inquire"} | BAKSAL BEAUTY`,
     description: t.consultation.body,
-    keywords: keywordsFor(locale, ["상담 신청", "consultation request", "문의하기", "appointment inquiry"]),
+    keywords: keywordsFor(locale, ["홈페이지 제작 문의", "병원 홈페이지 제작 문의", "website production inquiry", "clinic website inquiry"]),
     alternates: pageAlternates(locale, "inquire"),
     openGraph: pageOpenGraph({
       locale,
@@ -64,7 +64,7 @@ export default async function InquirePage({ params }: PageProps) {
 
           <aside className="glass-panel p-6 md:p-8">
             <p className="eyebrow text-[#dec47b]">Direct channels</p>
-            <h2 className="font-display mt-4 text-4xl">Talk to BAKSAL BEAUTY</h2>
+            <h2 className="font-display mt-4 text-4xl">Talk to LUDGI</h2>
             <p className="mt-5 leading-8 text-[#d9d0c9]">{t.inquiry.body}</p>
             <div className="mt-8">
               <SocialChannelButtons />

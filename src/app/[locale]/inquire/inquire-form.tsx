@@ -1,9 +1,19 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, Loader2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import type { HomeDictionary } from "@/i18n/dictionaries";
+import {
+  CalendarDays,
+  CheckCircle2,
+  FileText,
+  ImageIcon,
+  Loader2,
+  Paperclip,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useAuth } from "@/components/auth-provider";
 import type { Locale } from "@/i18n/config";
+import type { HomeDictionary } from "@/i18n/dictionaries";
 
 type ConsultationCopy = HomeDictionary["consultation"];
 
@@ -12,13 +22,76 @@ type SubmitState = {
   message: string;
 };
 
+type AttachmentPreview = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
+
+const maxAttachmentCount = 5;
+const maxAttachmentSize = 12 * 1024 * 1024;
+
+const formMessages: Record<
+  Locale,
+  {
+    privacy: string;
+    success: string;
+    fallbackError: string;
+    sending: string;
+    attachmentLabel: string;
+    attachmentHint: string;
+    attachmentLimit: string;
+    removeFile: string;
+  }
+> = {
+  ko: {
+    privacy: "문의 회신을 위해 입력한 개인정보를 수집하고 이메일 답변을 받을 수 있음에 동의합니다.",
+    success: "문의가 접수되었습니다. 주식회사 럿지 담당자가 확인 후 선택하신 채널로 안내드리겠습니다.",
+    fallbackError: "문의 접수에 실패했습니다.",
+    sending: "전송 중...",
+    attachmentLabel: "첨부파일",
+    attachmentHint: "이미지, PDF, 문서 파일을 끌어오거나 클릭해서 추가하세요.",
+    attachmentLimit: "최대 5개, 파일당 12MB까지 업로드할 수 있습니다.",
+    removeFile: "첨부파일 삭제",
+  },
+  en: {
+    privacy: "I agree that my information may be collected for reply and project consultation.",
+    success: "Your inquiry has been received. The LUDGI team will review it and contact you through your preferred channel.",
+    fallbackError: "Failed to submit the inquiry.",
+    sending: "Sending...",
+    attachmentLabel: "Attachments",
+    attachmentHint: "Drag images, PDFs, or documents here, or click to add files.",
+    attachmentLimit: "Up to 5 files, 12MB per file.",
+    removeFile: "Remove attachment",
+  },
+  zh: {
+    privacy: "我同意为回复咨询而收集所填写的个人信息，并通过邮件或所选渠道联系我。",
+    success: "咨询已提交。LUDGI 团队确认后会通过您选择的渠道联系您。",
+    fallbackError: "提交咨询失败。",
+    sending: "发送中...",
+    attachmentLabel: "附件",
+    attachmentHint: "可拖放图片、PDF 或文档，也可以点击添加文件。",
+    attachmentLimit: "最多 5 个文件，每个文件不超过 12MB。",
+    removeFile: "删除附件",
+  },
+  ja: {
+    privacy: "返信と制作相談のため、入力した個人情報の収集および連絡を受けることに同意します。",
+    success: "お問い合わせを受け付けました。LUDGI担当者が確認後、ご希望の方法でご案内します。",
+    fallbackError: "お問い合わせの送信に失敗しました。",
+    sending: "送信中...",
+    attachmentLabel: "添付ファイル",
+    attachmentHint: "画像、PDF、文書をドラッグするかクリックして追加してください。",
+    attachmentLimit: "最大5ファイル、1ファイル12MBまでアップロードできます。",
+    removeFile: "添付ファイルを削除",
+  },
+};
+
 const initialState = {
   name: "",
   phone: "",
   email: "",
   interest: "",
   preferredChannel: "",
-  subject: "",
   message: "",
   privacyAccepted: false,
 };
@@ -26,13 +99,38 @@ const initialState = {
 export function InquireForm({
   locale,
   copy,
+  className = "",
+  sourcePath,
 }: {
   locale: Locale;
   copy: ConsultationCopy;
+  className?: string;
+  sourcePath?: string;
 }) {
+  const { user } = useAuth();
   const [form, setForm] = useState(initialState);
+  const [attachments, setAttachments] = useState<AttachmentPreview[]>([]);
+  const [dragActive, setDragActive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>({ tone: "idle", message: "" });
+  const attachmentsRef = useRef<AttachmentPreview[]>([]);
+  const messages = formMessages[locale];
+  const emailValue = form.email || user?.email || "";
+
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  useEffect(
+    () => () => {
+      attachmentsRef.current.forEach((attachment) => {
+        if (attachment.previewUrl) {
+          URL.revokeObjectURL(attachment.previewUrl);
+        }
+      });
+    },
+    [],
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,38 +138,106 @@ export function InquireForm({
     setSubmitState({ tone: "idle", message: "" });
 
     try {
+      const body = new FormData();
+      body.append("name", form.name);
+      body.append("phone", form.phone);
+      body.append("email", emailValue);
+      body.append("interest", form.interest);
+      body.append("preferredChannel", form.preferredChannel);
+      body.append("message", form.message);
+      body.append("locale", locale);
+      body.append("privacyAccepted", String(form.privacyAccepted));
+      body.append("sourcePath", sourcePath ?? (typeof window === "undefined" ? `/${locale}/inquire` : window.location.pathname));
+      attachments.forEach((attachment) => body.append("attachments", attachment.file));
+
       const response = await fetch("/api/inquiries", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          locale,
-          sourcePath: typeof window === "undefined" ? `/${locale}/inquire` : window.location.pathname,
-        }),
+        body,
       });
       const json = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(json.error ?? "문의 접수에 실패했습니다.");
+        throw new Error(json.error ?? messages.fallbackError);
       }
 
+      clearAttachments();
       setForm(initialState);
       setSubmitState({
         tone: "success",
-        message: "문의가 접수되었습니다. 담당자가 확인 후 이메일 또는 선택하신 채널로 안내드리겠습니다.",
+        message: messages.success,
       });
     } catch (error) {
       setSubmitState({
         tone: "error",
-        message: error instanceof Error ? error.message : "문의 접수에 실패했습니다.",
+        message: error instanceof Error ? error.message : messages.fallbackError,
       });
     } finally {
       setSubmitting(false);
     }
   }
 
+  function addFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList);
+
+    if (!files.length) {
+      return;
+    }
+
+    const availableSlots = maxAttachmentCount - attachments.length;
+    const nextFiles = files.slice(0, Math.max(0, availableSlots));
+
+    if (!nextFiles.length) {
+      setSubmitState({ tone: "error", message: messages.attachmentLimit });
+      return;
+    }
+
+    const tooLarge = nextFiles.find((file) => file.size > maxAttachmentSize);
+
+    if (tooLarge) {
+      setSubmitState({ tone: "error", message: `${tooLarge.name}: ${messages.attachmentLimit}` });
+      return;
+    }
+
+    setSubmitState({ tone: "idle", message: "" });
+    setAttachments((previous) => [
+      ...previous,
+      ...nextFiles.map((file) => ({
+        id: crypto.randomUUID(),
+        file,
+        previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : "",
+      })),
+    ]);
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((previous) => {
+      const target = previous.find((attachment) => attachment.id === id);
+
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+
+      return previous.filter((attachment) => attachment.id !== id);
+    });
+  }
+
+  function clearAttachments() {
+    attachments.forEach((attachment) => {
+      if (attachment.previewUrl) {
+        URL.revokeObjectURL(attachment.previewUrl);
+      }
+    });
+    setAttachments([]);
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setDragActive(false);
+    addFiles(event.dataTransfer.files);
+  }
+
   return (
-    <form className="glass-panel grid gap-4 p-6 md:p-8" onSubmit={handleSubmit}>
+    <form className={`glass-panel grid gap-4 p-6 md:p-8 ${className}`} onSubmit={handleSubmit}>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-xs font-black uppercase">
           {copy.fields.name}
@@ -103,7 +269,7 @@ export function InquireForm({
           className="form-field"
           name="email"
           type="email"
-          value={form.email}
+          value={emailValue}
           placeholder={copy.placeholders.email}
           onChange={(event) => setForm({ ...form, email: event.target.value })}
           required
@@ -141,26 +307,14 @@ export function InquireForm({
             {copy.channels.map((channel) => (
               <option key={channel}>{channel}</option>
             ))}
-            <option>Email</option>
           </select>
         </label>
       </div>
 
       <label className="grid gap-2 text-xs font-black uppercase">
-        Subject
-        <input
-          className="form-field"
-          name="subject"
-          value={form.subject}
-          placeholder="상담 제목을 간단히 적어주세요."
-          onChange={(event) => setForm({ ...form, subject: event.target.value })}
-        />
-      </label>
-
-      <label className="grid gap-2 text-xs font-black uppercase">
         {copy.fields.message}
         <textarea
-          className="form-field min-h-40 resize-none"
+          className="form-field min-h-56 resize-none md:min-h-64"
           name="message"
           value={form.message}
           placeholder={copy.placeholders.message}
@@ -168,6 +322,80 @@ export function InquireForm({
           required
         />
       </label>
+
+      <div className="grid gap-3">
+        <label
+          className={`grid cursor-pointer gap-3 rounded-md border border-dashed p-5 transition ${
+            dragActive ? "border-[#dec47b] bg-[#dec47b]/12" : "border-white/16 bg-black/28 hover:border-[#dec47b]/45"
+          }`}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            setDragActive(true);
+          }}
+          onDragOver={(event) => event.preventDefault()}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            setDragActive(false);
+          }}
+          onDrop={handleDrop}
+        >
+          <input
+            className="sr-only"
+            type="file"
+            multiple
+            accept="image/*,.pdf,.txt,.doc,.docx,.xls,.xlsx"
+            onChange={(event) => {
+              if (event.target.files) {
+                addFiles(event.target.files);
+                event.target.value = "";
+              }
+            }}
+          />
+          <span className="inline-flex items-center gap-2 text-xs font-black uppercase text-[#dec47b]">
+            <UploadCloud size={15} />
+            {messages.attachmentLabel}
+          </span>
+          <span className="text-sm leading-6 text-[#d9d0c9]">{messages.attachmentHint}</span>
+          <span className="text-xs font-bold text-white/42">{messages.attachmentLimit}</span>
+        </label>
+
+        {attachments.length ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {attachments.map((attachment) => (
+              <div key={attachment.id} className="overflow-hidden rounded-md border border-white/10 bg-white/[0.035]">
+                {attachment.previewUrl ? (
+                  <div className="relative aspect-[4/3] bg-black/30">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={attachment.previewUrl} alt={attachment.file.name} className="h-full w-full object-cover" />
+                  </div>
+                ) : null}
+                <div className="flex items-center gap-3 p-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/28 text-[#dec47b]">
+                    {attachment.previewUrl ? <ImageIcon size={16} /> : <FileText size={16} />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-white">{attachment.file.name}</p>
+                    <p className="text-xs font-bold text-white/42">{formatFileSize(attachment.file.size)}</p>
+                  </div>
+                  <button
+                    aria-label={messages.removeFile}
+                    className="social-action-button !h-9 !w-9"
+                    onClick={() => removeAttachment(attachment.id)}
+                    type="button"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="inline-flex items-center gap-2 text-xs font-bold text-white/38">
+            <Paperclip size={13} />
+            {messages.attachmentLimit}
+          </p>
+        )}
+      </div>
 
       <label className="flex items-start gap-3 rounded-md border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-[#d9d0c9]">
         <input
@@ -177,7 +405,7 @@ export function InquireForm({
           onChange={(event) => setForm({ ...form, privacyAccepted: event.target.checked })}
           required
         />
-        <span>상담 회신을 위해 입력한 개인정보를 수집하고 이메일 답변을 받을 수 있음에 동의합니다.</span>
+        <span>{messages.privacy}</span>
       </label>
 
       {submitState.message ? (
@@ -197,8 +425,16 @@ export function InquireForm({
 
       <button className="button-primary mt-2 w-full" disabled={submitting} type="submit">
         {submitting ? <Loader2 className="animate-spin" size={16} /> : <CalendarDays size={16} />}
-        {submitting ? "Sending..." : copy.submit}
+        {submitting ? messages.sending : copy.submit}
       </button>
     </form>
   );
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) {
+    return `${Math.max(1, Math.round(size / 1024))}KB`;
+  }
+
+  return `${(size / 1024 / 1024).toFixed(1)}MB`;
 }

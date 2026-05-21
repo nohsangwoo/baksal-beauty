@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Geist_Mono, Noto_Sans_KR } from "next/font/google";
+import Script from "next/script";
 import { AuthProvider } from "@/components/auth-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { globalKeywords, siteName, siteUrl } from "@/lib/seo";
 import "./globals.css";
+
+const googleTagManagerId = "GTM-PXWZ6VWF";
 
 const sans = Noto_Sans_KR({
   variable: "--font-sans",
@@ -88,7 +91,24 @@ export default function RootLayout({
       className={`${sans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
       data-scroll-behavior="smooth"
     >
+      <Script id="google-tag-manager" strategy="beforeInteractive">
+        {`
+          (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+          new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+          j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+          'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+          })(window,document,'script','dataLayer','${googleTagManagerId}');
+        `}
+      </Script>
       <body className="min-h-full" suppressHydrationWarning>
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${googleTagManagerId}`}
+            height="0"
+            width="0"
+            style={{ display: "none", visibility: "hidden" }}
+          />
+        </noscript>
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>

@@ -5,8 +5,13 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Download,
+  ExternalLink,
+  FileText,
+  ImageIcon,
   Loader2,
   Mail,
+  Paperclip,
   Reply,
   Search,
 } from "lucide-react";
@@ -14,6 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   inquiryStatuses,
   type InquiryListResult,
+  type InquiryAttachment,
   type InquiryRecord,
   type InquiryStatus,
 } from "@/data/inquiry-content";
@@ -318,6 +324,7 @@ export function InquireAdminPanel() {
                   <p className="mt-6 whitespace-pre-wrap rounded-md bg-black/24 p-4 text-sm leading-7 text-[#fff8ef]">
                     {current.message}
                   </p>
+                  <AttachmentList attachments={current.attachments} />
                   <div className="mt-6 border-t border-white/10 pt-5">
                     <p className="eyebrow text-[#dec47b]">Customer History</p>
                     <div className="mt-4 grid gap-2">
@@ -443,8 +450,57 @@ function InquiryCard({
       <div className="mt-3 flex flex-wrap gap-2 text-[0.72rem] font-bold text-white/48">
         <span>{item.email}</span>
         <span>{item.replyCount} replies</span>
+        {item.attachments.length ? (
+          <span className="inline-flex items-center gap-1 text-[#dec47b]">
+            <Paperclip size={12} />
+            {item.attachments.length}
+          </span>
+        ) : null}
       </div>
     </button>
+  );
+}
+
+function AttachmentList({ attachments }: { attachments: InquiryAttachment[] }) {
+  if (!attachments.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-6 rounded-md border border-white/10 bg-black/20 p-4">
+      <p className="eyebrow text-[#dec47b]">Attachments</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {attachments.map((attachment) => {
+          const isImage = attachment.fileType.startsWith("image/");
+
+          return (
+            <article key={attachment.id} className="overflow-hidden rounded-md border border-white/10 bg-white/[0.035]">
+              {isImage ? (
+                <a className="relative block aspect-[4/3] bg-black/30" href={attachment.url} target="_blank" rel="noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={attachment.url} alt={attachment.fileName} className="h-full w-full object-cover" />
+                </a>
+              ) : null}
+              <div className="flex items-center gap-3 p-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/28 text-[#dec47b]">
+                  {isImage ? <ImageIcon size={16} /> : <FileText size={16} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-black text-white">{attachment.fileName}</p>
+                  <p className="text-xs font-bold text-white/42">{formatFileSize(attachment.fileSize)}</p>
+                </div>
+                <a className="social-action-button !h-9 !w-9" href={attachment.url} target="_blank" rel="noreferrer" title="View attachment">
+                  <ExternalLink size={15} />
+                </a>
+                <a className="social-action-button !h-9 !w-9" href={attachment.url} download={attachment.fileName} title="Download attachment">
+                  <Download size={15} />
+                </a>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -455,6 +511,14 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <dd className="break-all font-bold text-white/78">{value}</dd>
     </div>
   );
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) {
+    return `${Math.max(1, Math.round(size / 1024))}KB`;
+  }
+
+  return `${(size / 1024 / 1024).toFixed(1)}MB`;
 }
 
 function formatDate(value?: string | null) {

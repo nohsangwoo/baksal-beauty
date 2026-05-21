@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS inquiries (
   phone text NOT NULL DEFAULT '',
   email text NOT NULL DEFAULT '',
   interest text NOT NULL DEFAULT '',
-  preferred_channel text NOT NULL DEFAULT 'phone',
+  preferred_channel text NOT NULL DEFAULT 'email',
   subject text NOT NULL DEFAULT '',
   message text NOT NULL DEFAULT '',
   status text NOT NULL DEFAULT 'new',
@@ -117,6 +117,9 @@ ALTER TABLE inquiries
   ADD COLUMN IF NOT EXISTS replied_at timestamptz,
   ADD COLUMN IF NOT EXISTS closed_at timestamptz;
 
+ALTER TABLE inquiries
+  ALTER COLUMN preferred_channel SET DEFAULT 'email';
+
 CREATE TABLE IF NOT EXISTS inquiry_replies (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   inquiry_id uuid NOT NULL REFERENCES inquiries(id) ON DELETE CASCADE,
@@ -127,6 +130,17 @@ CREATE TABLE IF NOT EXISTS inquiry_replies (
   body text NOT NULL DEFAULT '',
   status text NOT NULL DEFAULT 'sent',
   error_message text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS inquiry_attachments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  inquiry_id uuid NOT NULL REFERENCES inquiries(id) ON DELETE CASCADE,
+  file_name text NOT NULL DEFAULT '',
+  file_type text NOT NULL DEFAULT '',
+  file_size integer NOT NULL DEFAULT 0,
+  url text NOT NULL DEFAULT '',
+  pathname text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -225,6 +239,9 @@ CREATE INDEX IF NOT EXISTS inquiries_status_created_idx
 
 CREATE INDEX IF NOT EXISTS inquiry_replies_inquiry_created_idx
   ON inquiry_replies (inquiry_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS inquiry_attachments_inquiry_created_idx
+  ON inquiry_attachments (inquiry_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS users_role_status_idx
   ON users (role, status);

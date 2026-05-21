@@ -262,6 +262,9 @@ export function SiteHeader({ t, locale, hasAnnouncementOffset = false }: SiteHea
               {item.label}
             </Link>
           ))}
+          <Link className="transition hover:text-[#dec47b]" href={`/${locale}/testadmin`}>
+            Demo Admin
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">

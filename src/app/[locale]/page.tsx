@@ -3,7 +3,6 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import {
   ArrowRight,
-  CalendarDays,
   Check,
   Mail,
   MapPin,
@@ -25,6 +24,7 @@ import { isLocale, locales, type Locale } from "@/i18n/config";
 import { getDictionary, type HomeDictionary } from "@/i18n/dictionaries";
 import { listBlogPosts } from "@/lib/blog-repository";
 import { keywordsFor, pageAlternates, pageOpenGraph } from "@/lib/seo";
+import { InquireForm } from "./inquire/inquire-form";
 
 type LocalePageProps = {
   params: Promise<{ locale: string }>;
@@ -76,7 +76,7 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
     <main className="min-h-screen overflow-hidden bg-[#1f1715] text-[#fff8ef]">
       <SiteHeader key={rawLocale} t={t} locale={rawLocale} hasAnnouncementOffset />
       <PageMotion />
-      <FloatingContactActions />
+      <FloatingContactActions inquiryCopy={t.consultation} locale={rawLocale} />
       <HeroSection t={t} />
       <PhilosophySection t={t} />
       <ServicesSection t={t} />
@@ -86,7 +86,7 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
       <DoctorsSection t={t} locale={rawLocale} />
       <ReviewsSection t={t} />
       <GuideSection t={t} />
-      <ConsultationSection t={t} />
+      <ConsultationSection locale={rawLocale} t={t} />
       <ShopSection t={t} />
       <BlogSection t={t} locale={rawLocale} posts={latestBlogPosts.items} />
       <ContactSection t={t} locale={rawLocale} />
@@ -477,7 +477,7 @@ function GuideSection({ t }: { t: HomeDictionary }) {
   );
 }
 
-function ConsultationSection({ t }: { t: HomeDictionary }) {
+function ConsultationSection({ locale, t }: { locale: Locale; t: HomeDictionary }) {
   return (
     <section data-reveal-section="" id="consult" className="grid bg-[#130f10] lg:grid-cols-2">
       <div
@@ -501,54 +501,7 @@ function ConsultationSection({ t }: { t: HomeDictionary }) {
             {t.consultation.title}
           </h2>
           <p className="mt-5 leading-8 text-[#d9d0c9]">{t.consultation.body}</p>
-          <form className="mt-10 grid gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-2 text-xs font-black uppercase">
-                {t.consultation.fields.name}
-                <input className="form-field" name="name" placeholder={t.consultation.placeholders.name} />
-              </label>
-              <label className="grid gap-2 text-xs font-black uppercase">
-                {t.consultation.fields.phone}
-                <input className="form-field" name="phone" placeholder={t.consultation.placeholders.phone} />
-              </label>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-2 text-xs font-black uppercase">
-                {t.consultation.fields.interest}
-                <select className="form-field" name="service" defaultValue="">
-                  <option value="" disabled>
-                    {t.consultation.placeholders.service}
-                  </option>
-                  {t.consultation.services.map((service) => (
-                    <option key={service}>{service}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-2 text-xs font-black uppercase">
-                {t.consultation.fields.channel}
-                <select className="form-field" name="channel" defaultValue="">
-                  <option value="" disabled>
-                    {t.consultation.placeholders.channel}
-                  </option>
-                  {t.consultation.channels.map((channel) => (
-                    <option key={channel}>{channel}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="grid gap-2 text-xs font-black uppercase">
-              {t.consultation.fields.message}
-              <textarea
-                className="form-field min-h-32 resize-none"
-                name="message"
-                placeholder={t.consultation.placeholders.message}
-              />
-            </label>
-            <button className="button-primary mt-2 w-full" type="button">
-              {t.consultation.submit}
-              <CalendarDays size={16} />
-            </button>
-          </form>
+          <InquireForm className="mt-10" copy={t.consultation} locale={locale} sourcePath={`/${locale}/#consult`} />
         </div>
       </div>
     </section>
