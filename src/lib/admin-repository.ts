@@ -1,5 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { adminUserSeeds, blogPostSeeds, inquirySeeds } from "@/data/admin-seed";
+import type { BlogStatus } from "@/data/blog-content";
+import { inquiryStatuses, type InquiryStatus } from "@/data/inquiry-content";
 import { blogPosts, inquiries, users } from "@/db/schema";
 import { getDb, hasDatabaseConnection } from "@/lib/db";
 import { normalizeRole, normalizeStatus } from "@/lib/rbac";
@@ -165,7 +167,7 @@ export async function createAdminRecord(resource: AdminResource, body: Record<st
         slug: String(body.slug ?? slugify(String(body.title ?? "blog-post"))),
         excerpt: String(body.subtitle ?? ""),
         category: String(body.meta ?? "Aesthetic Medicine"),
-        status: String(body.status ?? "draft"),
+        status: normalizeBlogStatus(body.status),
         imageUrl: String(body.imageUrl ?? ""),
         tags: normalizeTags(body.tags),
       })
@@ -183,7 +185,10 @@ export async function createAdminRecord(resource: AdminResource, body: Record<st
       interest: String(body.meta ?? ""),
       preferredChannel: normalizeTags(body.tags)[0] ?? "phone",
       message: String(body.subtitle ?? ""),
-      status: String(body.status ?? "new"),
+      subject: String(body.subject ?? body.meta ?? "상담 문의"),
+      status: normalizeInquiryStatus(body.status),
+      locale: String(body.locale ?? "ko"),
+      privacyAccepted: Boolean(body.privacyAccepted ?? true),
     })
     .returning({ id: inquiries.id });
 
@@ -224,7 +229,7 @@ export async function updateAdminRecord(
         title: String(body.title ?? ""),
         excerpt: String(body.subtitle ?? ""),
         category: String(body.meta ?? "Aesthetic Medicine"),
-        status: String(body.status ?? "draft"),
+        status: normalizeBlogStatus(body.status),
         imageUrl: String(body.imageUrl ?? ""),
         tags: normalizeTags(body.tags),
         updatedAt: sql`now()`,
@@ -239,7 +244,7 @@ export async function updateAdminRecord(
       name: String(body.title ?? ""),
       message: String(body.subtitle ?? ""),
       interest: String(body.meta ?? ""),
-      status: String(body.status ?? "new"),
+      status: normalizeInquiryStatus(body.status),
       preferredChannel: normalizeTags(body.tags)[0] ?? "phone",
       updatedAt: sql`now()`,
     })
@@ -283,6 +288,14 @@ function normalizeTags(value: unknown) {
   }
 
   return [];
+}
+
+function normalizeBlogStatus(value: unknown): BlogStatus {
+  return value === "published" || value === "archived" || value === "draft" ? value : "draft";
+}
+
+function normalizeInquiryStatus(value: unknown): InquiryStatus {
+  return inquiryStatuses.includes(value as InquiryStatus) ? (value as InquiryStatus) : "new";
 }
 
 function slugify(value: string) {

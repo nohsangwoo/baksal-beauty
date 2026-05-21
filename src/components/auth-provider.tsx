@@ -24,6 +24,7 @@ type AuthContextValue = {
   loginWithEmail: (email: string, password: string) => Promise<void>;
   registerWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  refreshSession: () => Promise<void>;
   logout: () => Promise<void>;
   redirectError: unknown | null;
   clearRedirectError: () => void;
@@ -328,6 +329,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await signInWithRedirect(getFirebaseAuth(), provider);
         }
       },
+      async refreshSession() {
+        const currentUser = getFirebaseAuth().currentUser ?? user;
+
+        if (!currentUser) {
+          throw new Error("No signed-in Firebase user.");
+        }
+
+        logAuthDebug("refreshSession.start", describeFirebaseUser(currentUser));
+        await syncNeonUser(currentUser, { throwOnError: true });
+        await syncAuthSession(currentUser, { forceRefresh: true });
+        logAuthDebug("refreshSession.done", describeFirebaseUser(currentUser));
+      },
       async logout() {
         await clearAuthSession();
         await signOut(getFirebaseAuth());
@@ -441,8 +454,8 @@ function sendAuthDebugLog(event: string, payload?: unknown) {
   }).catch(() => {});
 }
 
-async function syncAuthSession(user: User) {
-  const idToken = await user.getIdToken();
+async function syncAuthSession(user: User, options: { forceRefresh?: boolean } = {}) {
+  const idToken = await user.getIdToken(options.forceRefresh ?? false);
   const response = await fetch("/api/auth/session", {
     method: "POST",
     headers: { Authorization: `Bearer ${idToken}` },

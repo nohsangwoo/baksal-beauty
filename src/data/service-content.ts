@@ -45,10 +45,30 @@ export type ServiceRichDetailImage = {
   imageAlt: string;
 };
 
+export type ServiceSectionCopy = {
+  eyebrow: string;
+  title: string;
+  body?: string;
+};
+
 export type ServiceDetailCta = {
   title: string;
   body: string;
+  sectionOrder?: ServiceDetailSectionId[];
+  sectionCopy?: Partial<Record<ServiceDetailSectionId, ServiceSectionCopy>>;
 };
+
+export const serviceDetailSectionIds = [
+  "summary",
+  "recommended",
+  "detailPanels",
+  "beforeAfter",
+  "richImages",
+  "videos",
+  "detailCta",
+] as const;
+
+export type ServiceDetailSectionId = (typeof serviceDetailSectionIds)[number];
 
 export type ServiceItem = {
   id: string;

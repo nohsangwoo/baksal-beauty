@@ -17,6 +17,7 @@ When any DB structure or login behavior changes, update this skill in the same w
 - Firebase config lives in `src/lib/firebase-config.ts` and `src/lib/firebase-client.ts`.
 - Auth sync endpoint is `src/app/api/auth/sync-user/route.ts`.
 - Auth session endpoint is `src/app/api/auth/session/route.ts`; it verifies Firebase ID tokens and sets/clears the server cookie.
+- The session cookie lifetime is capped by the Firebase ID token `exp` with a safety buffer, so the server never keeps a cookie longer than the token should validate.
 - User persistence lives in `src/lib/user-repository.ts`.
 - Server auth/RBAC helpers live in `src/lib/auth-session.ts`, `src/lib/rbac.ts`, and `src/lib/auth-cookie.ts`.
 - Drizzle schema lives in `src/db/schema.ts`; SQL bootstrap/migration reference lives in `src/db/schema.sql`.
@@ -58,6 +59,7 @@ Google:
 - User Management and role grant/revoke is allowed only for active `Owner`.
 - Preserve existing role/status during auth sync. Firebase login must not downgrade an Owner to patient.
 - Admin pages must be protected on the server through `src/app/[locale]/admin/layout.tsx`.
+- If the server guard renders a denied state but Firebase is still signed in on the client, `AdminDenied` refreshes the Neon sync + session cookie once and then calls `router.refresh()` before showing a final denial. This prevents intermittent admin lockouts caused by an expired/missing SSR cookie.
 - Admin APIs must call `requireAdminUserFromRequest`; user-management APIs must pass `ownerOnly: true`.
 - Admin pages are split by route: `/admin`, `/admin/users`, `/admin/services`, `/admin/blog`, `/admin/inquire`.
 
@@ -72,6 +74,15 @@ Google:
   - FK/dependencies,
   - code references with `rg`.
 - Never drop `public.users` unless the user explicitly asks for a full auth reset and confirms data loss.
+
+## Inquiry Management
+
+- Public inquiries are stored in `public.inquiries`; admin email replies are stored in `public.inquiry_replies`.
+- Public submission endpoint is `src/app/api/inquiries/route.ts`; it validates name, phone, email, message, consent, locale, and source path.
+- Admin inquiry list/status endpoint is `src/app/api/admin/inquiries/route.ts` and `src/app/api/admin/inquiries/[id]/route.ts`.
+- Admin email reply endpoint is `src/app/api/admin/inquiries/[id]/reply/route.ts`; it must call `requireAdminUserFromRequest` before sending mail.
+- Gmail SMTP credentials are read from `GMAIL_USER` and `GMAIL_APP_PASSWORD` through `src/lib/email.ts`; never expose these values to the client.
+- Inquiry admin UI lives in `src/app/[locale]/admin/inquire/inquire-admin-panel.tsx` and should support search, status filters, unanswered view, pagination, status assignment, reply history, and answer-complete state.
 
 ## Debugging Checklist
 

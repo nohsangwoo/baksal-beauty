@@ -9,6 +9,7 @@ import { ContactSection, NewsletterSection } from "@/components/shared-sections"
 import { getDoctorTeam } from "@/data/doctor-profiles";
 import { isLocale, locales } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
+import { keywordsFor, pageAlternates, pageOpenGraph } from "@/lib/seo";
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -30,6 +31,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: team.metadataTitle,
     description: team.metadataDescription,
+    keywords: keywordsFor(locale, ["의료진", "대표원장", "doctor profile", "medical team"]),
+    alternates: pageAlternates(locale, "about"),
+    openGraph: pageOpenGraph({
+      locale,
+      path: "about",
+      title: team.metadataTitle,
+      description: team.metadataDescription,
+      image: "/images/clinic-interior.jpg",
+    }),
   };
 }
 

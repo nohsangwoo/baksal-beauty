@@ -75,6 +75,9 @@ export function PageShell({
                 {item.label}
               </Link>
             ))}
+            <Link className="hover:text-[#dec47b]" href={`/${locale}/company`}>
+              Company
+            </Link>
             <LanguageLinks locale={locale} ariaLabel={t.language.switchLabel} />
           </nav>
         </div>

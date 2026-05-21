@@ -13,6 +13,14 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import type {
+  BlogContentBlock,
+  BlogStatus,
+} from "@/data/blog-content";
+import type {
+  InquiryReplyStatus,
+  InquiryStatus,
+} from "@/data/inquiry-content";
+import type {
   ServiceBeforeAfter,
   ServiceContentCategory,
   ServiceDetailCta,
@@ -114,15 +122,41 @@ export const blogPosts = pgTable(
     slug: text("slug").notNull().unique(),
     excerpt: text("excerpt").notNull().default(""),
     category: text("category").notNull().default("Aesthetic Medicine"),
-    status: text("status").notNull().default("draft"),
+    status: text("status").$type<BlogStatus>().notNull().default("draft"),
     imageUrl: text("image_url").notNull().default(""),
+    imageAlt: text("image_alt").notNull().default(""),
     tags: text("tags").array().notNull().default(textArrayDefault),
+    featured: boolean("featured").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(100),
+    authorName: text("author_name").notNull().default("BAKSAL BEAUTY"),
     publishedAt: timestamp("published_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   },
   (table) => [
     index("blog_posts_status_created_idx").on(table.status, table.createdAt),
+    index("blog_posts_status_sort_idx").on(table.status, table.featured, table.sortOrder),
+  ],
+);
+
+export const blogPostTranslations = pgTable(
+  "blog_post_translations",
+  {
+    blogPostId: uuid("blog_post_id")
+      .notNull()
+      .references(() => blogPosts.id, { onDelete: "cascade" }),
+    locale: text("locale").$type<Locale>().notNull(),
+    title: text("title").notNull(),
+    excerpt: text("excerpt").notNull().default(""),
+    contentBlocks: jsonb("content_blocks").$type<BlogContentBlock[]>().notNull().default(sql`'[]'::jsonb`),
+    seoTitle: text("seo_title").notNull().default(""),
+    seoDescription: text("seo_description").notNull().default(""),
+    imageAlt: text("image_alt").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.blogPostId, table.locale] }),
   ],
 );
 
@@ -136,14 +170,41 @@ export const inquiries = pgTable(
     email: text("email").notNull().default(""),
     interest: text("interest").notNull().default(""),
     preferredChannel: text("preferred_channel").notNull().default("phone"),
+    subject: text("subject").notNull().default(""),
     message: text("message").notNull().default(""),
-    status: text("status").notNull().default("new"),
+    status: text("status").$type<InquiryStatus>().notNull().default("new"),
     assignedTo: text("assigned_to").notNull().default(""),
+    locale: text("locale").notNull().default("ko"),
+    privacyAccepted: boolean("privacy_accepted").notNull().default(false),
+    sourcePath: text("source_path").notNull().default(""),
+    repliedAt: timestamp("replied_at", { withTimezone: true, mode: "string" }),
+    closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   },
   (table) => [
     index("inquiries_status_created_idx").on(table.status, table.createdAt),
     uniqueIndex("inquiries_seed_key_unique_idx").on(table.seedKey).where(sql`${table.seedKey} IS NOT NULL AND ${table.seedKey} <> ''`),
+  ],
+);
+
+export const inquiryReplies = pgTable(
+  "inquiry_replies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    inquiryId: uuid("inquiry_id")
+      .notNull()
+      .references(() => inquiries.id, { onDelete: "cascade" }),
+    adminName: text("admin_name").notNull().default(""),
+    adminEmail: text("admin_email").notNull().default(""),
+    sentTo: text("sent_to").notNull().default(""),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull().default(""),
+    status: text("status").$type<InquiryReplyStatus>().notNull().default("sent"),
+    errorMessage: text("error_message").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("inquiry_replies_inquiry_created_idx").on(table.inquiryId, table.createdAt),
   ],
 );

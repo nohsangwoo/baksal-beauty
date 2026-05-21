@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { AdminConsole } from "@/components/admin-console";
+import { DashboardPanel } from "./_components/dashboard-panel";
 import { getCurrentUserFromCookies } from "@/lib/auth-session";
 import { canManageUsers } from "@/lib/rbac";
 import { isLocale } from "@/i18n/config";
@@ -17,11 +17,5 @@ export default async function AdminDashboardPage({ params }: PageProps) {
 
   const currentUser = await getCurrentUserFromCookies();
 
-  return (
-    <AdminConsole
-      locale={locale}
-      section="dashboard"
-      canManageUsers={canManageUsers(currentUser)}
-    />
-  );
+  return <DashboardPanel canManageUsers={canManageUsers(currentUser)} />;
 }

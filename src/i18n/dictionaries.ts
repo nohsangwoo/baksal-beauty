@@ -155,6 +155,7 @@ export type HomeDictionary = {
     fields: {
       name: string;
       phone: string;
+      email: string;
       interest: string;
       channel: string;
       message: string;
@@ -162,6 +163,7 @@ export type HomeDictionary = {
     placeholders: {
       name: string;
       phone: string;
+      email: string;
       service: string;
       channel: string;
       message: string;
@@ -397,6 +399,7 @@ export const dictionaries: Record<Locale, HomeDictionary> = {
       fields: {
         name: "이름 *",
         phone: "연락처 *",
+        email: "이메일 *",
         interest: "관심 시술",
         channel: "희망 연락 방식",
         message: "상담 내용",
@@ -404,6 +407,7 @@ export const dictionaries: Record<Locale, HomeDictionary> = {
       placeholders: {
         name: "성함",
         phone: "010-0000-0000",
+        email: "reply@example.com",
         service: "관심 시술 선택",
         channel: "연락 방식",
         message: "궁금한 점을 남겨주세요.",
@@ -631,6 +635,7 @@ export const dictionaries: Record<Locale, HomeDictionary> = {
       fields: {
         name: "Your name *",
         phone: "Your phone *",
+        email: "Email *",
         interest: "Interest",
         channel: "Preferred channel",
         message: "Message",
@@ -638,6 +643,7 @@ export const dictionaries: Record<Locale, HomeDictionary> = {
       placeholders: {
         name: "Name",
         phone: "010-0000-0000",
+        email: "reply@example.com",
         service: "Select interest",
         channel: "Contact method",
         message: "Tell us what you would like to discuss.",
@@ -860,6 +866,7 @@ export const dictionaries: Record<Locale, HomeDictionary> = {
       fields: {
         name: "姓名 *",
         phone: "联系电话 *",
+        email: "电子邮箱 *",
         interest: "关注项目",
         channel: "希望联系渠道",
         message: "咨询内容",
@@ -867,6 +874,7 @@ export const dictionaries: Record<Locale, HomeDictionary> = {
       placeholders: {
         name: "姓名",
         phone: "010-0000-0000",
+        email: "reply@example.com",
         service: "选择关注项目",
         channel: "联系方式",
         message: "请留下想咨询的问题。",
@@ -1089,6 +1097,7 @@ export const dictionaries: Record<Locale, HomeDictionary> = {
       fields: {
         name: "お名前 *",
         phone: "連絡先 *",
+        email: "メール *",
         interest: "関心のある施術",
         channel: "希望連絡方法",
         message: "相談内容",
@@ -1096,6 +1105,7 @@ export const dictionaries: Record<Locale, HomeDictionary> = {
       placeholders: {
         name: "お名前",
         phone: "010-0000-0000",
+        email: "reply@example.com",
         service: "施術を選択",
         channel: "連絡方法",
         message: "相談したい内容を入力してください。",

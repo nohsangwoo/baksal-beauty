@@ -19,9 +19,12 @@ import { BeforeAfterSlider, TreatmentPillars } from "@/components/home-interacti
 import { PageMotion } from "@/components/page-motion";
 import { ContactSection, NewsletterSection } from "@/components/shared-sections";
 import { LanguageLinks, SiteHeader } from "@/components/site-header";
+import type { BlogPost } from "@/data/blog-content";
 import { getDoctorTeam } from "@/data/doctor-profiles";
 import { isLocale, locales, type Locale } from "@/i18n/config";
 import { getDictionary, type HomeDictionary } from "@/i18n/dictionaries";
+import { listBlogPosts } from "@/lib/blog-repository";
+import { keywordsFor, pageAlternates, pageOpenGraph } from "@/lib/seo";
 
 type LocalePageProps = {
   params: Promise<{ locale: string }>;
@@ -43,9 +46,18 @@ export async function generateMetadata({ params }: LocalePageProps): Promise<Met
   return {
     title: t.metadata.title,
     description: t.metadata.description,
-    alternates: {
-      canonical: `/${rawLocale}`,
-      languages: Object.fromEntries(locales.map((locale) => [locale, `/${locale}`])),
+    keywords: keywordsFor(rawLocale),
+    alternates: pageAlternates(rawLocale),
+    openGraph: pageOpenGraph({
+      locale: rawLocale,
+      title: t.metadata.title,
+      description: t.metadata.description,
+    }),
+    twitter: {
+      card: "summary_large_image",
+      title: t.metadata.title,
+      description: t.metadata.description,
+      images: ["/opengraph-image"],
     },
   };
 }
@@ -58,6 +70,7 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
   }
 
   const t = getDictionary(rawLocale);
+  const latestBlogPosts = await listBlogPosts(rawLocale, { limit: 3 });
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#1f1715] text-[#fff8ef]">
@@ -75,7 +88,7 @@ export default async function LocalizedHome({ params }: LocalePageProps) {
       <GuideSection t={t} />
       <ConsultationSection t={t} />
       <ShopSection t={t} />
-      <BlogSection t={t} />
+      <BlogSection t={t} locale={rawLocale} posts={latestBlogPosts.items} />
       <ContactSection t={t} locale={rawLocale} />
       <NewsletterSection t={t} />
       <Footer t={t} locale={rawLocale} />
@@ -588,7 +601,7 @@ function ShopSection({ t }: { t: HomeDictionary }) {
   );
 }
 
-function BlogSection({ t }: { t: HomeDictionary }) {
+function BlogSection({ t, locale, posts }: { t: HomeDictionary; locale: Locale; posts: BlogPost[] }) {
   return (
     <section data-reveal-section="" id="blog" className="py-24 md:py-32">
       <div className="section-shell">
@@ -599,16 +612,16 @@ function BlogSection({ t }: { t: HomeDictionary }) {
           </h2>
         </div>
         <div className="mt-14 grid gap-7 lg:grid-cols-3">
-          {t.blog.posts.map((post) => (
-            <article key={post.title} className="group">
+          {posts.map((post) => (
+            <article key={post.slug} className="group">
               <div
                 data-magnetic=""
                 data-magnetic-strength="5"
                 className="relative aspect-[1.45] overflow-hidden rounded-lg border border-white/10"
               >
                 <Image
-                  src={post.image}
-                  alt={post.title}
+                  src={post.imageUrl || "/images/blog-consultation.jpg"}
+                  alt={post.imageAlt || post.title}
                   fill
                   sizes="(min-width: 1024px) 33vw, 100vw"
                   className="object-cover transition duration-500 group-hover:scale-105"
@@ -616,7 +629,7 @@ function BlogSection({ t }: { t: HomeDictionary }) {
               </div>
               <p className="eyebrow mt-6 text-[#e38aa0]">{post.category}</p>
               <h3 className="font-display mt-4 min-h-24 text-3xl leading-snug">{post.title}</h3>
-              <a className="mt-6 inline-flex items-center gap-2 border-t border-white/10 pt-5 text-xs font-black uppercase hover:text-[#dec47b]" href="#blog">
+              <a className="mt-6 inline-flex items-center gap-2 border-t border-white/10 pt-5 text-xs font-black uppercase hover:text-[#dec47b]" href={`/${locale}/blog/${post.slug}`}>
                 {t.common.readMore}
                 <ArrowRight size={14} />
               </a>
@@ -647,6 +660,9 @@ function Footer({ t, locale }: { t: HomeDictionary; locale: Locale }) {
               {item.label}
             </a>
           ))}
+          <a className="hover:text-[#dec47b]" href={`/${locale}/company`}>
+            Company
+          </a>
           <LanguageLinks locale={locale} ariaLabel={t.language.switchLabel} />
         </nav>
         <div className="grid gap-10 lg:grid-cols-[0.8fr_1.1fr_0.8fr]">

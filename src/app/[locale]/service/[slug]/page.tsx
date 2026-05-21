@@ -21,18 +21,24 @@ import { ContactSection, NewsletterSection } from "@/components/shared-sections"
 import {
   getServiceDetailContent,
   serviceDetailLabels,
+  type NormalizedServiceDetail,
+  type ServiceDetailLabels,
 } from "@/data/service-detail-defaults";
 import {
   servicePageCopy,
+  serviceDetailSectionIds,
   serviceSeeds,
+  type ServiceDetailSectionId,
   type ServiceDetailPanel,
   type ServiceItem,
   type ServiceRichDetailImage,
+  type ServiceSectionCopy,
   type ServiceVideoPreview,
 } from "@/data/service-content";
 import { isLocale, locales } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
 import { getRelatedServices, getServiceBySlug } from "@/lib/service-repository";
+import { keywordsFor, pageAlternates, pageOpenGraph } from "@/lib/seo";
 
 type PageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -63,6 +69,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${service.title} | BAKSAL BEAUTY`,
     description: service.summary,
+    keywords: keywordsFor(locale, [
+      service.title,
+      service.subtitle,
+      service.category,
+      ...service.tags,
+      ...service.highlights,
+    ]),
+    alternates: pageAlternates(locale, `service/${service.slug}`),
+    openGraph: pageOpenGraph({
+      locale,
+      path: `service/${service.slug}`,
+      title: service.title,
+      description: service.summary,
+      image: service.imageUrl || "/opengraph-image",
+    }),
   };
 }
 
@@ -84,6 +105,14 @@ export default async function ServiceDetailPage({ params }: PageProps) {
   const labels = serviceDetailLabels[locale];
   const detail = getServiceDetailContent(service, locale);
   const relatedServices = await getRelatedServices(locale, service, 2);
+  const sectionOrder = normalizeServiceSectionOrder(detail.detailCta.sectionOrder);
+  const sectionCopy = serviceDetailSectionIds.reduce(
+    (acc, section) => {
+      acc[section] = getPublicSectionCopy(service, detail, labels, section);
+      return acc;
+    },
+    {} as Record<ServiceDetailSectionId, ServiceSectionCopy>,
+  );
 
   return (
     <PageShell
@@ -95,7 +124,13 @@ export default async function ServiceDetailPage({ params }: PageProps) {
       image={service.imageUrl}
       imageAlt={service.imageAlt}
     >
-      <section id="service-summary" data-reveal-section="" className="bg-[#1f1715] py-16 md:py-24">
+      <div className="flex flex-col">
+      <section
+        id="service-summary"
+        data-reveal-section=""
+        className="bg-[#1f1715] py-16 md:py-24"
+        style={{ order: getSectionOrderIndex(sectionOrder, "summary") }}
+      >
         <div className="section-shell">
           <Link
             href={`/${locale}/service`}
@@ -104,6 +139,16 @@ export default async function ServiceDetailPage({ params }: PageProps) {
             <ArrowLeft size={16} />
             {labels.back}
           </Link>
+
+          <div className="mx-auto mt-10 max-w-3xl text-center">
+            <p className="eyebrow text-[#dec47b]">{sectionCopy.summary.eyebrow}</p>
+            <h2 className="font-display mt-4 text-5xl leading-tight md:text-6xl">
+              {sectionCopy.summary.title}
+            </h2>
+            {sectionCopy.summary.body ? (
+              <p className="mt-6 leading-8 text-[#d9d0c9]">{sectionCopy.summary.body}</p>
+            ) : null}
+          </div>
 
           <div className="mt-9 grid gap-4 md:grid-cols-5">
             <InfoTile
@@ -132,19 +177,24 @@ export default async function ServiceDetailPage({ params }: PageProps) {
               value={detail.surgeryInfo.recoveryPeriod}
             />
           </div>
-
-          <p className="mt-5 text-sm leading-7 text-[#b6aaa6]">{labels.surgeryInfoBody}</p>
         </div>
       </section>
 
-      <section id="recommended-for" data-reveal-section="" className="border-y border-white/10 bg-[#241b18] py-20 md:py-28">
+      <section
+        id="recommended-for"
+        data-reveal-section=""
+        className="border-y border-white/10 bg-[#241b18] py-20 md:py-28"
+        style={{ order: getSectionOrderIndex(sectionOrder, "recommended") }}
+      >
         <div className="section-shell grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
           <div>
-            <p className="eyebrow text-[#dec47b]">{labels.recommended}</p>
+            <p className="eyebrow text-[#dec47b]">{sectionCopy.recommended.eyebrow}</p>
             <h2 className="font-display mt-4 text-5xl leading-tight md:text-6xl">
-              {service.subtitle}
+              {sectionCopy.recommended.title}
             </h2>
-            <p className="mt-6 leading-8 text-[#d9d0c9]">{labels.recommendedBody}</p>
+            {sectionCopy.recommended.body ? (
+              <p className="mt-6 leading-8 text-[#d9d0c9]">{sectionCopy.recommended.body}</p>
+            ) : null}
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <Link className="button-primary" href={`/${locale}/inquire?service=${service.slug}`}>
                 {labels.inquire}
@@ -173,14 +223,21 @@ export default async function ServiceDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      <section id="detail-panels" data-reveal-section="" className="bg-[#1f1715] py-20 md:py-28">
+      <section
+        id="detail-panels"
+        data-reveal-section=""
+        className="bg-[#1f1715] py-20 md:py-28"
+        style={{ order: getSectionOrderIndex(sectionOrder, "detailPanels") }}
+      >
         <div className="section-shell">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="eyebrow text-[#dec47b]">{labels.detailPanels}</p>
+            <p className="eyebrow text-[#dec47b]">{sectionCopy.detailPanels.eyebrow}</p>
             <h2 className="font-display mt-4 text-5xl leading-tight md:text-6xl">
-              {service.title}
+              {sectionCopy.detailPanels.title}
             </h2>
-            <p className="mt-6 leading-8 text-[#d9d0c9]">{labels.detailPanelsBody}</p>
+            {sectionCopy.detailPanels.body ? (
+              <p className="mt-6 leading-8 text-[#d9d0c9]">{sectionCopy.detailPanels.body}</p>
+            ) : null}
           </div>
 
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
@@ -191,14 +248,21 @@ export default async function ServiceDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      <section id="before-after" data-reveal-section="" className="border-y border-white/10 bg-[#120d0e] py-20 md:py-28">
+      <section
+        id="before-after"
+        data-reveal-section=""
+        className="border-y border-white/10 bg-[#120d0e] py-20 md:py-28"
+        style={{ order: getSectionOrderIndex(sectionOrder, "beforeAfter") }}
+      >
         <div className="section-shell grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
           <div>
-            <p className="eyebrow text-[#dec47b]">{labels.beforeAfter}</p>
+            <p className="eyebrow text-[#dec47b]">{sectionCopy.beforeAfter.eyebrow}</p>
             <h2 className="font-display mt-4 text-5xl leading-tight md:text-6xl">
-              {detail.beforeAfter.title}
+              {sectionCopy.beforeAfter.title}
             </h2>
-            <p className="mt-6 leading-8 text-[#d9d0c9]">{detail.beforeAfter.body}</p>
+            {sectionCopy.beforeAfter.body ? (
+              <p className="mt-6 leading-8 text-[#d9d0c9]">{sectionCopy.beforeAfter.body}</p>
+            ) : null}
           </div>
 
           <div data-magnetic="" data-magnetic-strength="4" className="relative overflow-hidden rounded-lg border border-white/10 bg-black">
@@ -229,20 +293,27 @@ export default async function ServiceDetailPage({ params }: PageProps) {
               </div>
             </div>
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/72 to-transparent p-5">
-              <p className="text-xs font-bold leading-6 text-white/72">{detail.beforeAfter.body}</p>
+              <p className="text-xs font-bold leading-6 text-white/72">{sectionCopy.beforeAfter.body}</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="rich-detail-images" data-reveal-section="" className="bg-[#1f1715] py-20 md:py-28">
+      <section
+        id="rich-detail-images"
+        data-reveal-section=""
+        className="bg-[#1f1715] py-20 md:py-28"
+        style={{ order: getSectionOrderIndex(sectionOrder, "richImages") }}
+      >
         <div className="section-shell">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="eyebrow text-[#dec47b]">{labels.richImages}</p>
+            <p className="eyebrow text-[#dec47b]">{sectionCopy.richImages.eyebrow}</p>
             <h2 className="font-display mt-4 text-5xl leading-tight md:text-6xl">
-              {labels.richImagesTitle(service.title)}
+              {sectionCopy.richImages.title}
             </h2>
-            <p className="mt-6 leading-8 text-[#d9d0c9]">{labels.richImagesBody}</p>
+            {sectionCopy.richImages.body ? (
+              <p className="mt-6 leading-8 text-[#d9d0c9]">{sectionCopy.richImages.body}</p>
+            ) : null}
           </div>
 
           <div className="mx-auto mt-12 grid max-w-5xl gap-7">
@@ -253,15 +324,22 @@ export default async function ServiceDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      <section id="videos" data-reveal-section="" className="bg-[#241b18] py-20 md:py-28">
+      <section
+        id="videos"
+        data-reveal-section=""
+        className="bg-[#241b18] py-20 md:py-28"
+        style={{ order: getSectionOrderIndex(sectionOrder, "videos") }}
+      >
         <div className="section-shell">
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="max-w-3xl">
-              <p className="eyebrow text-[#dec47b]">{labels.videos}</p>
+              <p className="eyebrow text-[#dec47b]">{sectionCopy.videos.eyebrow}</p>
               <h2 className="font-display mt-4 text-5xl leading-tight md:text-6xl">
-                {service.title} Preview
+                {sectionCopy.videos.title}
               </h2>
-              <p className="mt-6 leading-8 text-[#d9d0c9]">{labels.videosBody}</p>
+              {sectionCopy.videos.body ? (
+                <p className="mt-6 leading-8 text-[#d9d0c9]">{sectionCopy.videos.body}</p>
+              ) : null}
             </div>
             <span className="rounded-full border border-white/10 px-4 py-2 text-xs font-black text-white/58">
               {detail.youtubeVideos.length} videos
@@ -276,12 +354,19 @@ export default async function ServiceDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      <section id="related-services" data-reveal-section="" className="bg-[#1f1715] py-20 md:py-28">
+      <section
+        id="related-services"
+        data-reveal-section=""
+        className="bg-[#1f1715] py-20 md:py-28"
+        style={{ order: getSectionOrderIndex(sectionOrder, "detailCta") }}
+      >
         <div className="section-shell grid gap-10 lg:grid-cols-[0.85fr_1.15fr]">
           <article className="glass-panel p-7 md:p-9">
-            <p className="eyebrow text-[#dec47b]">{labels.detailCta}</p>
-            <h2 className="font-display mt-4 text-5xl leading-tight">{detail.detailCta.title}</h2>
-            <p className="mt-6 leading-8 text-[#d9d0c9]">{detail.detailCta.body}</p>
+            <p className="eyebrow text-[#dec47b]">{sectionCopy.detailCta.eyebrow}</p>
+            <h2 className="font-display mt-4 text-5xl leading-tight">{sectionCopy.detailCta.title}</h2>
+            {sectionCopy.detailCta.body ? (
+              <p className="mt-6 leading-8 text-[#d9d0c9]">{sectionCopy.detailCta.body}</p>
+            ) : null}
             <div className="mt-8 grid gap-3">
               {service.highlights.map((item) => (
                 <p key={item} className="flex items-center gap-3 text-sm font-bold text-white/78">
@@ -311,6 +396,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
           </div>
         </div>
       </section>
+      </div>
 
       <ContactSection t={t} locale={locale} />
       <NewsletterSection t={t} locale={locale} />
@@ -487,4 +573,86 @@ function RelatedServiceCard({ item, locale }: { item: ServiceItem; locale: strin
       </div>
     </Link>
   );
+}
+
+function getPublicSectionCopy(
+  service: ServiceItem,
+  detail: NormalizedServiceDetail,
+  labels: ServiceDetailLabels,
+  section: ServiceDetailSectionId,
+): ServiceSectionCopy {
+  const saved = detail.detailCta.sectionCopy?.[section];
+  const fallback = getPublicSectionCopyFallback(service, detail, labels, section);
+
+  return {
+    ...fallback,
+    ...(saved ?? {}),
+  };
+}
+
+function getPublicSectionCopyFallback(
+  service: ServiceItem,
+  detail: NormalizedServiceDetail,
+  labels: ServiceDetailLabels,
+  section: ServiceDetailSectionId,
+): ServiceSectionCopy {
+  switch (section) {
+    case "summary":
+      return {
+        eyebrow: labels.surgeryInfo,
+        title: labels.surgeryInfo,
+        body: labels.surgeryInfoBody,
+      };
+    case "recommended":
+      return {
+        eyebrow: labels.recommended,
+        title: service.subtitle,
+        body: labels.recommendedBody,
+      };
+    case "detailPanels":
+      return {
+        eyebrow: labels.detailPanels,
+        title: service.title,
+        body: labels.detailPanelsBody,
+      };
+    case "beforeAfter":
+      return {
+        eyebrow: labels.beforeAfter,
+        title: detail.beforeAfter.title,
+        body: detail.beforeAfter.body,
+      };
+    case "richImages":
+      return {
+        eyebrow: labels.richImages,
+        title: labels.richImagesTitle(service.title),
+        body: labels.richImagesBody,
+      };
+    case "videos":
+      return {
+        eyebrow: labels.videos,
+        title: `${service.title} Preview`,
+        body: labels.videosBody,
+      };
+    case "detailCta":
+      return {
+        eyebrow: labels.detailCta,
+        title: detail.detailCta.title,
+        body: detail.detailCta.body,
+      };
+  }
+}
+
+function normalizeServiceSectionOrder(value: unknown): ServiceDetailSectionId[] {
+  const input = Array.isArray(value) ? value : [];
+  const known = input.filter((item): item is ServiceDetailSectionId =>
+    serviceDetailSectionIds.includes(item as ServiceDetailSectionId),
+  );
+
+  return [...known, ...serviceDetailSectionIds.filter((item) => !known.includes(item))];
+}
+
+function getSectionOrderIndex(order: ServiceDetailSectionId[], section: ServiceDetailSectionId) {
+  const index = order.indexOf(section);
+
+  return index >= 0 ? index : serviceDetailSectionIds.indexOf(section);
 }

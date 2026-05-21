@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { AdminConsole } from "@/components/admin-console";
+import { ServiceAdminPanel } from "./service-admin-panel";
 import { isLocale } from "@/i18n/config";
 
 type PageProps = {
@@ -13,5 +13,5 @@ export default async function AdminServicesPage({ params }: PageProps) {
     notFound();
   }
 
-  return <AdminConsole locale={locale} section="services" />;
+  return <ServiceAdminPanel initialLocale={locale} />;
 }

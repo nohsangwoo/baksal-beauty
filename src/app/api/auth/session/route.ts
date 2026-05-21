@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SESSION_MAX_AGE = 55 * 60;
+const SESSION_EXPIRY_SAFETY_SECONDS = 60;
 
 export async function POST(request: Request) {
   const idToken = getBearerToken(request);
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
 
   response.cookies.set(AUTH_TOKEN_COOKIE, idToken, {
     httpOnly: true,
-    maxAge: SESSION_MAX_AGE,
+    maxAge: getCookieMaxAge(idToken),
     path: "/",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -68,4 +69,36 @@ function getBearerToken(request: Request) {
   }
 
   return authorization.slice(7).trim();
+}
+
+function getCookieMaxAge(idToken: string) {
+  const tokenMaxAge = getTokenSecondsUntilExpiry(idToken);
+
+  if (!tokenMaxAge) {
+    return SESSION_MAX_AGE;
+  }
+
+  return Math.max(1, Math.min(SESSION_MAX_AGE, tokenMaxAge - SESSION_EXPIRY_SAFETY_SECONDS));
+}
+
+function getTokenSecondsUntilExpiry(idToken: string) {
+  try {
+    const [, payload] = idToken.split(".");
+
+    if (!payload) {
+      return null;
+    }
+
+    const decodedPayload = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      exp?: number;
+    };
+
+    if (!decodedPayload.exp) {
+      return null;
+    }
+
+    return Math.floor(decodedPayload.exp - Date.now() / 1000);
+  } catch {
+    return null;
+  }
 }

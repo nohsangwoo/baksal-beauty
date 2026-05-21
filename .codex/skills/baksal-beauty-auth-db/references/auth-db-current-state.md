@@ -10,6 +10,8 @@
   - Email/password
   - Google popup login
 - Client auth sends Firebase ID tokens to `/api/auth/session`; the server verifies the token and writes a short-lived HttpOnly `baksal_auth_token` cookie so server-rendered admin pages and admin APIs can verify the Firebase identity before checking Neon RBAC.
+- `/api/auth/session` caps the cookie max age by the Firebase token expiry with a safety buffer.
+- If an admin route is server-rendered without a valid cookie while the client still has a Firebase user, `AdminDenied` performs one client-side session refresh and `router.refresh()` before showing the final restricted state.
 - Firebase config fallback values are in `src/lib/firebase-config.ts`.
 - Expected public env var names:
   - `NEXT_PUBLIC_FIREBASE_API_KEY`

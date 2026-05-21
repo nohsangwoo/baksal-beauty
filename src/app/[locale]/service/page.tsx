@@ -5,6 +5,7 @@ import { ServiceBrowser } from "@/components/service-browser";
 import { servicePageCopy } from "@/data/service-content";
 import { isLocale, locales } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
+import { keywordsFor, pageAlternates, pageOpenGraph } from "@/lib/seo";
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -26,6 +27,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${copy.eyebrow} | BAKSAL BEAUTY`,
     description: copy.description,
+    keywords: keywordsFor(locale, Object.values(copy.tabs)),
+    alternates: pageAlternates(locale, "service"),
+    openGraph: pageOpenGraph({
+      locale,
+      path: "service",
+      title: `${copy.eyebrow} | BAKSAL BEAUTY`,
+      description: copy.description,
+      image: "/images/service-lifting.jpg",
+    }),
   };
 }
 

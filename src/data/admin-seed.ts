@@ -1,3 +1,6 @@
+import type { BlogStatus } from "@/data/blog-content";
+import type { InquiryStatus } from "@/data/inquiry-content";
+
 export type AdminUserSeed = {
   name: string;
   email: string;
@@ -10,7 +13,7 @@ export type BlogPostSeed = {
   slug: string;
   excerpt: string;
   category: string;
-  status: string;
+  status: BlogStatus;
   imageUrl: string;
   tags: string[];
 };
@@ -23,7 +26,7 @@ export type InquirySeed = {
   interest: string;
   preferredChannel: string;
   message: string;
-  status: string;
+  status: InquiryStatus;
 };
 
 export const adminUserSeeds: AdminUserSeed[] = [
