@@ -80,7 +80,8 @@ Google:
 
 - Public inquiries are stored in `public.inquiries`; admin email replies are stored in `public.inquiry_replies`.
 - Inquiry attachments are stored in `public.inquiry_attachments`; files are uploaded through server-side Vercel Blob writes and only Blob URLs/pathnames are persisted in Neon.
-- Public submission endpoint is `src/app/api/inquiries/route.ts`; it accepts JSON or `multipart/form-data`, validates name, phone, email, message, consent, locale, source path, and attachment limits/types.
+- Public submission endpoint is `src/app/api/inquiries/route.ts`; it accepts JSON or `multipart/form-data`, verifies Cloudflare Turnstile before uploads/DB writes, and validates name, phone, email, message, consent, locale, source path, and attachment limits/types.
+- Inquiry Turnstile uses `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in the client form and `TURNSTILE_SECRET_KEY` on the server. Never expose the secret key to client code.
 - Admin inquiry list/status endpoint is `src/app/api/admin/inquiries/route.ts` and `src/app/api/admin/inquiries/[id]/route.ts`.
 - Admin email reply endpoint is `src/app/api/admin/inquiries/[id]/reply/route.ts`; it must call `requireAdminUserFromRequest` before sending mail.
 - Gmail SMTP credentials are read from `GMAIL_USER` and `GMAIL_APP_PASSWORD` through `src/lib/email.ts`; never expose these values to the client.

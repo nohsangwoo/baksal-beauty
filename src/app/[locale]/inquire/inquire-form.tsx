@@ -10,6 +10,7 @@ import {
   Trash2,
   UploadCloud,
 } from "lucide-react";
+import Script from "next/script";
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
 import type { Locale } from "@/i18n/config";
@@ -28,8 +29,29 @@ type AttachmentPreview = {
   previewUrl: string;
 };
 
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string;
+          action?: string;
+          theme?: "dark" | "light" | "auto";
+          callback?: (token: string) => void;
+          "expired-callback"?: () => void;
+          "error-callback"?: () => void;
+        },
+      ) => string;
+      reset: (widgetId?: string) => void;
+      remove?: (widgetId: string) => void;
+    };
+  }
+}
+
 const maxAttachmentCount = 5;
 const maxAttachmentSize = 12 * 1024 * 1024;
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
 const formMessages: Record<
   Locale,
@@ -42,6 +64,9 @@ const formMessages: Record<
     attachmentHint: string;
     attachmentLimit: string;
     removeFile: string;
+    turnstileLabel: string;
+    turnstileRequired: string;
+    turnstileMissing: string;
   }
 > = {
   ko: {
@@ -53,6 +78,9 @@ const formMessages: Record<
     attachmentHint: "이미지, PDF, 문서 파일을 끌어오거나 클릭해서 추가하세요.",
     attachmentLimit: "최대 5개, 파일당 12MB까지 업로드할 수 있습니다.",
     removeFile: "첨부파일 삭제",
+    turnstileLabel: "보안 확인",
+    turnstileRequired: "보안 확인을 완료해주세요.",
+    turnstileMissing: "보안 확인 설정이 누락되었습니다. 관리자에게 문의해주세요.",
   },
   en: {
     privacy: "I agree that my information may be collected for reply and project consultation.",
@@ -63,6 +91,9 @@ const formMessages: Record<
     attachmentHint: "Drag images, PDFs, or documents here, or click to add files.",
     attachmentLimit: "Up to 5 files, 12MB per file.",
     removeFile: "Remove attachment",
+    turnstileLabel: "Security verification",
+    turnstileRequired: "Please complete the security verification.",
+    turnstileMissing: "Security verification is not configured. Please contact the administrator.",
   },
   zh: {
     privacy: "我同意为回复咨询而收集所填写的个人信息，并通过邮件或所选渠道联系我。",
@@ -73,6 +104,9 @@ const formMessages: Record<
     attachmentHint: "可拖放图片、PDF 或文档，也可以点击添加文件。",
     attachmentLimit: "最多 5 个文件，每个文件不超过 12MB。",
     removeFile: "删除附件",
+    turnstileLabel: "安全验证",
+    turnstileRequired: "请先完成安全验证。",
+    turnstileMissing: "安全验证尚未配置，请联系管理员。",
   },
   ja: {
     privacy: "返信と制作相談のため、入力した個人情報の収集および連絡を受けることに同意します。",
@@ -83,6 +117,9 @@ const formMessages: Record<
     attachmentHint: "画像、PDF、文書をドラッグするかクリックして追加してください。",
     attachmentLimit: "最大5ファイル、1ファイル12MBまでアップロードできます。",
     removeFile: "添付ファイルを削除",
+    turnstileLabel: "セキュリティ確認",
+    turnstileRequired: "セキュリティ確認を完了してください。",
+    turnstileMissing: "セキュリティ確認が設定されていません。管理者にお問い合わせください。",
   },
 };
 
@@ -111,6 +148,8 @@ export function InquireForm({
   const [form, setForm] = useState(initialState);
   const [attachments, setAttachments] = useState<AttachmentPreview[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetNonce, setTurnstileResetNonce] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>({ tone: "idle", message: "" });
   const attachmentsRef = useRef<AttachmentPreview[]>([]);
@@ -138,6 +177,10 @@ export function InquireForm({
     setSubmitState({ tone: "idle", message: "" });
 
     try {
+      if (!turnstileToken) {
+        throw new Error(messages.turnstileRequired);
+      }
+
       const body = new FormData();
       body.append("name", form.name);
       body.append("phone", form.phone);
@@ -148,6 +191,7 @@ export function InquireForm({
       body.append("locale", locale);
       body.append("privacyAccepted", String(form.privacyAccepted));
       body.append("sourcePath", sourcePath ?? (typeof window === "undefined" ? `/${locale}/inquire` : window.location.pathname));
+      body.append("cf-turnstile-response", turnstileToken);
       attachments.forEach((attachment) => body.append("attachments", attachment.file));
 
       const response = await fetch("/api/inquiries", {
@@ -161,6 +205,7 @@ export function InquireForm({
       }
 
       clearAttachments();
+      resetTurnstile();
       setForm(initialState);
       setSubmitState({
         tone: "success",
@@ -171,6 +216,7 @@ export function InquireForm({
         tone: "error",
         message: error instanceof Error ? error.message : messages.fallbackError,
       });
+      resetTurnstile();
     } finally {
       setSubmitting(false);
     }
@@ -234,6 +280,11 @@ export function InquireForm({
     event.preventDefault();
     setDragActive(false);
     addFiles(event.dataTransfer.files);
+  }
+
+  function resetTurnstile() {
+    setTurnstileToken("");
+    setTurnstileResetNonce((value) => value + 1);
   }
 
   return (
@@ -397,6 +448,14 @@ export function InquireForm({
         )}
       </div>
 
+      <TurnstileVerification
+        label={messages.turnstileLabel}
+        missingMessage={messages.turnstileMissing}
+        resetNonce={turnstileResetNonce}
+        siteKey={turnstileSiteKey}
+        onToken={setTurnstileToken}
+      />
+
       <label className="flex items-start gap-3 rounded-md border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-[#d9d0c9]">
         <input
           className="mt-1"
@@ -423,7 +482,7 @@ export function InquireForm({
         </div>
       ) : null}
 
-      <button className="button-primary mt-2 w-full" disabled={submitting} type="submit">
+      <button className="button-primary mt-2 w-full" disabled={submitting || !turnstileToken} type="submit">
         {submitting ? <Loader2 className="animate-spin" size={16} /> : <CalendarDays size={16} />}
         {submitting ? messages.sending : copy.submit}
       </button>
@@ -437,4 +496,101 @@ function formatFileSize(size: number) {
   }
 
   return `${(size / 1024 / 1024).toFixed(1)}MB`;
+}
+
+function TurnstileVerification({
+  label,
+  missingMessage,
+  resetNonce,
+  siteKey,
+  onToken,
+}: {
+  label: string;
+  missingMessage: string;
+  resetNonce: number;
+  siteKey: string;
+  onToken: (token: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string>("");
+  const onTokenRef = useRef(onToken);
+
+  useEffect(() => {
+    onTokenRef.current = onToken;
+  }, [onToken]);
+
+  useEffect(() => {
+    if (!siteKey) {
+      return;
+    }
+
+    let retryTimer = 0;
+
+    function renderWhenReady() {
+      if (widgetIdRef.current) {
+        return;
+      }
+
+      if (containerRef.current && window.turnstile) {
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          action: "inquiry",
+          theme: "dark",
+          callback: (token) => onTokenRef.current(token),
+          "expired-callback": () => onTokenRef.current(""),
+          "error-callback": () => onTokenRef.current(""),
+        });
+        return;
+      }
+
+      retryTimer = window.setTimeout(renderWhenReady, 250);
+    }
+
+    renderWhenReady();
+
+    return () => {
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
+    };
+  }, [siteKey]);
+
+  useEffect(() => {
+    if (!resetNonce || !widgetIdRef.current) {
+      return;
+    }
+
+    window.turnstile?.reset(widgetIdRef.current);
+  }, [resetNonce]);
+
+  useEffect(
+    () => () => {
+      if (widgetIdRef.current) {
+        window.turnstile?.remove?.(widgetIdRef.current);
+      }
+    },
+    [],
+  );
+
+  if (!siteKey) {
+    return (
+      <div className="rounded-md border border-[#d62f55]/35 bg-[#d62f55]/10 p-4 text-sm font-bold text-[#ffd8df]">
+        {missingMessage}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-2">
+      <Script
+        id="cloudflare-turnstile"
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+        strategy="afterInteractive"
+      />
+      <p className="text-xs font-black uppercase text-white/82">{label}</p>
+      <div className="min-h-[65px] rounded-md border border-white/10 bg-black/24 p-3">
+        <div ref={containerRef} />
+      </div>
+    </div>
+  );
 }

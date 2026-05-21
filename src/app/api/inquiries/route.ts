@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const maxAttachmentCount = 5;
 const maxAttachmentSize = 12 * 1024 * 1024;
 const maxTotalAttachmentSize = 36 * 1024 * 1024;
+const maxRequestSize = 42 * 1024 * 1024;
 const allowedAttachmentTypes = new Set([
   "image/jpeg",
   "image/png",
@@ -33,16 +34,46 @@ const allowedAttachmentExtensions = new Set([
   ".xls",
   ".xlsx",
 ]);
+const turnstileVerifyUrl = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+type ParsedInquiryPayload = Record<string, unknown> & {
+  attachmentFiles?: File[];
+  turnstileToken?: string;
+};
 
 export async function POST(request: Request) {
   try {
+    const contentLength = Number(request.headers.get("content-length") ?? 0);
+
+    if (contentLength > maxRequestSize) {
+      throw new Error("요청 용량이 너무 큽니다. 첨부파일을 줄여 다시 시도해주세요.");
+    }
+
     const contentType = request.headers.get("content-type") ?? "";
-    const payload = contentType.includes("multipart/form-data")
+    const payload: ParsedInquiryPayload = contentType.includes("multipart/form-data")
       ? await parseMultipartInquiry(request)
       : await request.json();
-    const id = await createInquiry(payload);
+    const attachmentFiles = Array.isArray(payload.attachmentFiles) ? payload.attachmentFiles : [];
+    const turnstileToken = getTurnstileToken(payload);
 
-    return NextResponse.json({ id }, { status: 201 });
+    await verifyTurnstileToken(turnstileToken, request);
+
+    const attachments = attachmentFiles.length ? await uploadInquiryAttachments(attachmentFiles) : [];
+    delete payload.attachmentFiles;
+    delete payload.turnstileToken;
+    delete payload["cf-turnstile-response"];
+
+    const id = await createInquiry({ ...payload, attachments });
+
+    return NextResponse.json(
+      { id },
+      {
+        status: 201,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "문의 접수에 실패했습니다." },
@@ -68,7 +99,8 @@ async function parseMultipartInquiry(request: Request) {
     locale: readFormValue(formData, "locale"),
     privacyAccepted: readFormValue(formData, "privacyAccepted") === "true",
     sourcePath: readFormValue(formData, "sourcePath"),
-    attachments: await uploadInquiryAttachments(files),
+    turnstileToken: readFormValue(formData, "cf-turnstile-response") || readFormValue(formData, "turnstileToken"),
+    attachmentFiles: files,
   };
 }
 
@@ -122,6 +154,67 @@ async function uploadInquiryAttachments(files: File[]) {
         pathname: blob.pathname,
       };
     }),
+  );
+}
+
+async function verifyTurnstileToken(token: string, request: Request) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+
+  if (!secret) {
+    throw new Error("보안 검증 설정이 누락되었습니다. TURNSTILE_SECRET_KEY를 확인해주세요.");
+  }
+
+  if (!token) {
+    throw new Error("보안 확인을 완료해주세요.");
+  }
+
+  const body = new FormData();
+  body.append("secret", secret);
+  body.append("response", token);
+
+  const remoteIp = getClientIp(request);
+
+  if (remoteIp) {
+    body.append("remoteip", remoteIp);
+  }
+
+  body.append("idempotency_key", crypto.randomUUID());
+
+  const response = await fetch(turnstileVerifyUrl, {
+    method: "POST",
+    body,
+    signal: AbortSignal.timeout(8000),
+  });
+
+  if (!response.ok) {
+    throw new Error("보안 검증 서버와 통신하지 못했습니다. 잠시 후 다시 시도해주세요.");
+  }
+
+  const result = (await response.json()) as {
+    success?: boolean;
+    action?: string;
+    "error-codes"?: string[];
+  };
+
+  if (!result.success || result.action !== "inquiry") {
+    console.warn("Turnstile verification failed", {
+      action: result.action,
+      errorCodes: result["error-codes"],
+    });
+    throw new Error("보안 검증에 실패했습니다. 새로고침 후 다시 시도해주세요.");
+  }
+}
+
+function getTurnstileToken(payload: ParsedInquiryPayload) {
+  return String(payload.turnstileToken ?? payload["cf-turnstile-response"] ?? "").trim();
+}
+
+function getClientIp(request: Request) {
+  return (
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    ""
   );
 }
 
