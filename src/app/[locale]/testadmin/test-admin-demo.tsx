@@ -22,6 +22,7 @@ import {
 import { useMemo, useState, type DragEvent, type FormEvent } from "react";
 
 type DemoTab = "dashboard" | "users" | "services" | "blog" | "inquire";
+type DemoRecordKind = "service" | "blog" | "inquire";
 type DemoStatus = "published" | "draft" | "new" | "replied";
 type DemoRole = "Owner" | "Admin" | "Manager" | "Staff" | "Patient";
 
@@ -112,8 +113,12 @@ const initialPosts: DemoRecord[] = [
     status: "published",
     image: "/images/blog-consultation.jpg",
     sections: [
-      { id: "intro", title: "Intro", body: "검색 의도에 맞는 병원 홈페이지 구조를 설명합니다." },
-      { id: "body", title: "Content Blocks", body: "텍스트, 이미지, CTA 블록을 조합합니다." },
+      { id: "intro", title: "Opening Hook", body: "환자가 검색하는 순간의 고민을 첫 문단에서 바로 받아주고, 병원 홈페이지 제작 문의로 자연스럽게 이어지도록 구성합니다." },
+      { id: "intent", title: "Search Intent Map", body: "병원 홈페이지, 성형외과 홈페이지 제작, 홈페이지 제작 의뢰처럼 전환 의도가 높은 키워드를 문단 구조와 소제목에 분산합니다." },
+      { id: "visual", title: "Visual Story", body: "실제 데모 화면, 상담 폼, 관리자 CMS 이미지를 배치해 단순 제작사가 아니라 운영까지 설계하는 파트너임을 보여줍니다." },
+      { id: "proof", title: "Trust Proof", body: "Neon DB, Blob Storage, Firebase Auth, 다국어 SEO, 문의 자동화 등 구현 가능한 기능을 근거 중심으로 설명합니다." },
+      { id: "cta", title: "Conversion CTA", body: "글 중간과 마지막에 홈페이지 제작 문의 버튼을 반복 배치하고, 빠른 상담으로 이어지는 문구를 짧게 정리합니다." },
+      { id: "publish", title: "Publish Checklist", body: "SEO 제목, OG 이미지, RSS 노출, sitemap 반영 여부를 공개 전 체크하는 관리 흐름을 제공합니다." },
     ],
   },
   {
@@ -123,8 +128,12 @@ const initialPosts: DemoRecord[] = [
     status: "draft",
     image: "/images/blog-recovery.jpg",
     sections: [
-      { id: "editor", title: "Visual Editor", body: "관리자가 보이는 그대로 편집하는 흐름을 설명합니다." },
-      { id: "publish", title: "Publish Flow", body: "임시저장과 공개 상태를 분리합니다." },
+      { id: "editor", title: "Visual Editor", body: "콘텐츠를 선택하면 실제 블로그 상세 페이지와 비슷한 중앙 화면에서 문구를 직접 클릭해 수정할 수 있습니다." },
+      { id: "blocks", title: "Block Library", body: "히어로, 본문 이미지, 인용, CTA, 체크리스트 블록을 기본 템플릿으로 제공하고 순서를 자유롭게 바꾸는 구조입니다." },
+      { id: "language", title: "Language Tabs", body: "한국어를 기준으로 영어, 중국어, 일본어 번역 초안을 생성하고 언어별 문구를 별도로 검수하는 흐름을 보여줍니다." },
+      { id: "draft", title: "Draft Flow", body: "임시저장과 공개 상태를 분리해 원고 검수 중에도 실제 사용자 화면에는 노출되지 않도록 관리합니다." },
+      { id: "image", title: "Image Handling", body: "대표 이미지와 본문 이미지를 드래그 앤 드랍으로 넣고, 공개 전 미리보기에서 비율과 톤을 확인합니다." },
+      { id: "seo", title: "SEO Assist", body: "검색 제목, 설명, 키워드, 내부 링크를 편집 화면에서 함께 관리해 콘텐츠 발행 품질을 일정하게 유지합니다." },
     ],
   },
 ];
@@ -137,8 +146,12 @@ const initialInquiries: DemoRecord[] = [
     status: "new",
     image: "/images/clinic-interior.jpg",
     sections: [
-      { id: "request", title: "Request", body: "성형외과 홈페이지 신규 제작과 블로그 SEO를 문의했습니다." },
-      { id: "reply", title: "Reply Draft", body: "예상 범위와 미팅 일정을 안내하는 답변 초안입니다." },
+      { id: "request", title: "Original Inquiry", body: "성형외과 홈페이지 신규 제작, 블로그 SEO, 문의 관리, 다국어 페이지 구축이 가능한지 문의했습니다." },
+      { id: "priority", title: "Priority Notes", body: "브랜드 무드가 이미 정해져 있고 빠른 런칭이 필요해 초기 견적과 작업 범위를 먼저 안내해야 합니다." },
+      { id: "attachments", title: "Attachment Review", body: "레퍼런스 이미지 3장과 기존 홈페이지 캡처가 첨부된 것으로 가정하고 관리자 화면에서 바로 확인합니다." },
+      { id: "reply", title: "Reply Draft", body: "안녕하세요. 주식회사 럿지입니다. 전달주신 병원 홈페이지 제작 범위를 기준으로 1차 미팅 가능 일정과 예상 구축 항목을 안내드립니다." },
+      { id: "status", title: "Follow-up Timeline", body: "신규 접수, 담당자 배정, 답변 작성, 답변 완료 순서로 처리 상태를 관리합니다." },
+      { id: "memo", title: "Internal Memo", body: "테스트 관리자에서는 실제 메일 발송 없이 답변 작성과 상태 변경 흐름만 체험할 수 있습니다." },
     ],
   },
   {
@@ -148,8 +161,11 @@ const initialInquiries: DemoRecord[] = [
     status: "replied",
     image: "/images/blog-laser.jpg",
     sections: [
-      { id: "request", title: "Request", body: "기존 병원 블로그 구조 개선과 다국어 전환을 문의했습니다." },
-      { id: "reply", title: "Reply Sent", body: "답변 완료 상태로 변경된 mock 문의입니다." },
+      { id: "request", title: "Original Inquiry", body: "기존 병원 블로그 구조 개선, 진료 과목별 SEO 랜딩 페이지, 일본어와 중국어 콘텐츠 전환을 문의했습니다." },
+      { id: "scope", title: "Scope Summary", body: "기존 게시글을 유지하면서 카테고리 구조와 URL 설계를 정리하고, 블로그 상세 화면 템플릿을 재정비하는 방향입니다." },
+      { id: "reply", title: "Reply Sent", body: "답변 완료 상태로 변경된 mock 문의입니다. 운영 데이터와 완전히 분리된 데모용 응답 내역입니다." },
+      { id: "history", title: "Reply History", body: "2026.05.22 오후 3:10 답변 발송, 2026.05.22 오후 4:00 추가 자료 요청으로 기록된 시나리오입니다." },
+      { id: "next", title: "Next Action", body: "콘텐츠 이전 범위와 관리자가 직접 수정할 필드 목록을 정리해 후속 미팅에서 확인합니다." },
     ],
   },
 ];
@@ -310,6 +326,7 @@ export function TestAdminDemo() {
           {activeTab === "users" ? <UsersRbacPanel users={users} setUsers={setUsers} showToast={showToast} /> : null}
           {activeTab === "services" ? (
             <VisualStudio
+              variant="service"
               records={services}
               setRecords={setServices}
               selectedId={selectedIds.services}
@@ -320,6 +337,7 @@ export function TestAdminDemo() {
           ) : null}
           {activeTab === "blog" ? (
             <VisualStudio
+              variant="blog"
               records={posts}
               setRecords={setPosts}
               selectedId={selectedIds.blog}
@@ -330,6 +348,7 @@ export function TestAdminDemo() {
           ) : null}
           {activeTab === "inquire" ? (
             <VisualStudio
+              variant="inquire"
               records={inquiries}
               setRecords={setInquiries}
               selectedId={selectedIds.inquire}
@@ -371,6 +390,7 @@ function Dashboard({ counts, records }: { counts: Record<string, number>; record
 }
 
 function VisualStudio({
+  variant,
   records,
   setRecords,
   selectedId,
@@ -378,6 +398,7 @@ function VisualStudio({
   title,
   showToast,
 }: {
+  variant: DemoRecordKind;
   records: DemoRecord[];
   setRecords: (records: DemoRecord[]) => void;
   selectedId: string;
@@ -507,34 +528,589 @@ function VisualStudio({
         </div>
       </aside>
 
-      <main className="glass-panel overflow-hidden">
-        <div className="border-b border-white/10 p-5">
-          <p className="eyebrow text-[#dec47b]">Live Preview</p>
-          <h2 className="font-display mt-2 text-4xl">{selected.title}</h2>
-        </div>
-        <div className="relative min-h-[360px]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={selected.image} alt="" className="h-[360px] w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#130f10] via-transparent to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-7">
-            <p className="eyebrow text-[#dec47b]">{selected.status}</p>
-            <h3 className="font-display mt-2 text-5xl">{selected.title}</h3>
-            <p className="mt-4 max-w-2xl leading-8 text-[#d9d0c9]">{selected.subtitle}</p>
-          </div>
-        </div>
-        <div className="grid gap-4 p-6 md:grid-cols-2">
-          {selected.sections.map((section, index) => (
-            <article key={section.id} className="rounded-md border border-white/10 bg-white/[0.035] p-5">
-              <p className="text-xs font-black uppercase text-[#dec47b]">{String(index + 1).padStart(2, "0")}</p>
-              <h4 className="font-display mt-3 text-3xl">{section.title}</h4>
-              <p className="mt-3 leading-7 text-[#d9d0c9]">{section.body}</p>
-            </article>
-          ))}
-        </div>
-      </main>
+      <VisualPreview variant={variant} record={selected} updateRecord={updateRecord} showToast={showToast} />
 
       <EditorPanel record={selected} updateRecord={updateRecord} showToast={showToast} />
     </div>
+  );
+}
+
+function VisualPreview({
+  variant,
+  record,
+  updateRecord,
+  showToast,
+}: {
+  variant: DemoRecordKind;
+  record: DemoRecord;
+  updateRecord: (id: string, patch: Partial<DemoRecord>) => void;
+  showToast: (message: string) => void;
+}) {
+  function updateSection(sectionId: string, patch: Partial<DemoSection>) {
+    updateRecord(record.id, {
+      sections: record.sections.map((section) => (section.id === sectionId ? { ...section, ...patch } : section)),
+    });
+  }
+
+  function moveSection(index: number, direction: -1 | 1) {
+    const target = index + direction;
+
+    if (target < 0 || target >= record.sections.length) {
+      return;
+    }
+
+    const next = [...record.sections];
+    [next[index], next[target]] = [next[target], next[index]];
+    updateRecord(record.id, { sections: next });
+    showToast("Preview section order updated.");
+  }
+
+  function addSection() {
+    updateRecord(record.id, {
+      sections: [
+        ...record.sections,
+        {
+          id: crypto.randomUUID(),
+          title: variant === "inquire" ? "New Response Note" : "New Content Block",
+          body: "가운데 프리뷰에서 바로 수정할 수 있는 새 mock 섹션입니다.",
+        },
+      ],
+    });
+    showToast("Preview section added.");
+  }
+
+  function deleteSection(id: string) {
+    updateRecord(record.id, { sections: record.sections.filter((section) => section.id !== id) });
+    showToast("Preview section removed.");
+  }
+
+  if (variant === "blog") {
+    return (
+      <BlogVisualPreview
+        record={record}
+        updateRecord={updateRecord}
+        updateSection={updateSection}
+        moveSection={moveSection}
+        deleteSection={deleteSection}
+        addSection={addSection}
+        showToast={showToast}
+      />
+    );
+  }
+
+  if (variant === "inquire") {
+    return (
+      <InquiryVisualPreview
+        record={record}
+        updateRecord={updateRecord}
+        updateSection={updateSection}
+        moveSection={moveSection}
+        deleteSection={deleteSection}
+        addSection={addSection}
+        showToast={showToast}
+      />
+    );
+  }
+
+  return (
+    <ServiceVisualPreview
+      record={record}
+      updateRecord={updateRecord}
+      updateSection={updateSection}
+      moveSection={moveSection}
+      deleteSection={deleteSection}
+      addSection={addSection}
+    />
+  );
+}
+
+function EditableField({
+  value,
+  onChange,
+  className = "",
+  placeholder = "",
+  as = "input",
+  rows = 2,
+  tone = "dark",
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+  placeholder?: string;
+  as?: "input" | "textarea";
+  rows?: number;
+  tone?: "dark" | "light";
+  label: string;
+}) {
+  const focusClass =
+    tone === "light"
+      ? "focus:bg-[#2a171c]/5 focus:ring-[#8c5365]/30"
+      : "focus:bg-white/[0.07] focus:ring-[#dec47b]/45";
+  const sharedClass = `w-full rounded-md border border-transparent bg-transparent outline-none transition focus:border-transparent focus:px-2 focus:ring-1 ${focusClass} ${className}`;
+
+  if (as === "textarea") {
+    return (
+      <textarea
+        aria-label={label}
+        className={`${sharedClass} resize-none`}
+        placeholder={placeholder}
+        rows={rows}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
+  return (
+    <input
+      aria-label={label}
+      className={sharedClass}
+      placeholder={placeholder}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
+
+function PreviewStatusControls({
+  status,
+  onChange,
+  allowed = statuses,
+}: {
+  status: DemoStatus;
+  onChange: (status: DemoStatus) => void;
+  allowed?: DemoStatus[];
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {allowed.map((item) => (
+        <button
+          key={item}
+          className={`rounded-full border px-3 py-1.5 text-[0.68rem] font-black uppercase transition ${
+            status === item
+              ? "border-[#dec47b] bg-[#dec47b]/15 text-[#dec47b]"
+              : "border-white/10 text-white/48 hover:border-[#dec47b]/45 hover:text-[#dec47b]"
+          }`}
+          onClick={() => onChange(item)}
+          type="button"
+        >
+          {item}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function InlineSectionEditor({
+  section,
+  index,
+  tone = "dark",
+  updateSection,
+  moveSection,
+  deleteSection,
+}: {
+  section: DemoSection;
+  index: number;
+  tone?: "dark" | "light";
+  updateSection: (sectionId: string, patch: Partial<DemoSection>) => void;
+  moveSection: (index: number, direction: -1 | 1) => void;
+  deleteSection: (id: string) => void;
+}) {
+  const light = tone === "light";
+
+  return (
+    <article
+      className={`group rounded-md border p-5 transition ${
+        light
+          ? "border-[#201716]/10 bg-white text-[#241a19] shadow-sm"
+          : "border-white/10 bg-white/[0.035] text-white"
+      }`}
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <span className={`text-xs font-black uppercase ${light ? "text-[#8a5364]" : "text-[#dec47b]"}`}>
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <div className="flex gap-1.5 opacity-70 transition group-hover:opacity-100">
+          <button className="social-action-button !h-8 !w-8" onClick={() => moveSection(index, -1)} type="button" title="Move up">
+            <ArrowUp size={13} />
+          </button>
+          <button className="social-action-button !h-8 !w-8" onClick={() => moveSection(index, 1)} type="button" title="Move down">
+            <ArrowDown size={13} />
+          </button>
+          <button className="social-action-button !h-8 !w-8" onClick={() => deleteSection(section.id)} type="button" title="Delete section">
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+      <EditableField
+        label={`Section ${index + 1} title`}
+        value={section.title}
+        onChange={(value) => updateSection(section.id, { title: value })}
+        tone={tone}
+        className={`font-display text-2xl ${light ? "text-[#241a19]" : "text-white"}`}
+      />
+      <EditableField
+        as="textarea"
+        rows={4}
+        label={`Section ${index + 1} body`}
+        value={section.body}
+        onChange={(value) => updateSection(section.id, { body: value })}
+        tone={tone}
+        className={`mt-3 leading-7 ${light ? "text-[#5c4a45]" : "text-[#d9d0c9]"}`}
+      />
+    </article>
+  );
+}
+
+function ServiceVisualPreview({
+  record,
+  updateRecord,
+  updateSection,
+  moveSection,
+  deleteSection,
+  addSection,
+}: {
+  record: DemoRecord;
+  updateRecord: (id: string, patch: Partial<DemoRecord>) => void;
+  updateSection: (sectionId: string, patch: Partial<DemoSection>) => void;
+  moveSection: (index: number, direction: -1 | 1) => void;
+  deleteSection: (id: string) => void;
+  addSection: () => void;
+}) {
+  return (
+    <main className="glass-panel overflow-hidden">
+      <div className="border-b border-white/10 p-5">
+        <p className="eyebrow text-[#dec47b]">Service Page Preview</p>
+        <EditableField
+          label="Service preview title"
+          value={record.title}
+          onChange={(value) => updateRecord(record.id, { title: value })}
+          className="font-display mt-2 text-4xl text-white"
+        />
+      </div>
+      <div className="relative min-h-[390px]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={record.image} alt="" className="h-[390px] w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#130f10] via-[#130f10]/22 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-7">
+          <p className="eyebrow text-[#dec47b]">{record.status}</p>
+          <EditableField
+            label="Service hero title"
+            value={record.title}
+            onChange={(value) => updateRecord(record.id, { title: value })}
+            className="font-display mt-2 text-5xl text-white"
+          />
+          <EditableField
+            as="textarea"
+            rows={2}
+            label="Service hero subtitle"
+            value={record.subtitle}
+            onChange={(value) => updateRecord(record.id, { subtitle: value })}
+            className="mt-4 max-w-2xl leading-8 text-[#d9d0c9]"
+          />
+        </div>
+      </div>
+      <div className="grid gap-4 p-6 md:grid-cols-2">
+        {record.sections.map((section, index) => (
+          <InlineSectionEditor
+            key={section.id}
+            section={section}
+            index={index}
+            updateSection={updateSection}
+            moveSection={moveSection}
+            deleteSection={deleteSection}
+          />
+        ))}
+      </div>
+      <div className="border-t border-white/10 p-6">
+        <button className="button-outline w-fit" onClick={addSection} type="button">
+          <Plus size={16} />
+          Add Preview Section
+        </button>
+      </div>
+    </main>
+  );
+}
+
+function BlogVisualPreview({
+  record,
+  updateRecord,
+  updateSection,
+  moveSection,
+  deleteSection,
+  addSection,
+  showToast,
+}: {
+  record: DemoRecord;
+  updateRecord: (id: string, patch: Partial<DemoRecord>) => void;
+  updateSection: (sectionId: string, patch: Partial<DemoSection>) => void;
+  moveSection: (index: number, direction: -1 | 1) => void;
+  deleteSection: (id: string) => void;
+  addSection: () => void;
+  showToast: (message: string) => void;
+}) {
+  return (
+    <main className="glass-panel overflow-hidden">
+      <div className="flex flex-col gap-4 border-b border-white/10 p-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="eyebrow text-[#dec47b]">Blog Visual Editor</p>
+          <h2 className="font-display mt-2 text-4xl">Article preview</h2>
+        </div>
+        <PreviewStatusControls
+          allowed={["published", "draft"]}
+          status={record.status}
+          onChange={(status) => updateRecord(record.id, { status })}
+        />
+      </div>
+
+      <article className="bg-[#f5efe6] text-[#241a19]">
+        <div className="relative min-h-[390px] overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={record.image} alt="" className="h-[390px] w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#241a19]/82 via-[#241a19]/18 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-7 md:p-10">
+            <p className="eyebrow text-[#dec47b]">BAKSAL BEAUTY INSIGHT</p>
+            <EditableField
+              label="Blog article title"
+              value={record.title}
+              onChange={(value) => updateRecord(record.id, { title: value })}
+              className="font-display mt-3 text-5xl text-white md:text-6xl"
+            />
+            <EditableField
+              as="textarea"
+              rows={2}
+              label="Blog article description"
+              value={record.subtitle}
+              onChange={(value) => updateRecord(record.id, { subtitle: value })}
+              className="mt-4 max-w-3xl leading-8 text-[#f2e8df]"
+            />
+          </div>
+        </div>
+
+        <div className="p-6 md:p-10">
+          <div className="grid gap-4 lg:grid-cols-[0.78fr_0.42fr]">
+            <div className="rounded-md border border-[#241a19]/10 bg-white p-6 shadow-sm">
+              <p className="eyebrow text-[#8a5364]">Clickable Article Lead</p>
+              <EditableField
+                as="textarea"
+                rows={5}
+                label="Blog lead text"
+                value={record.sections[0]?.body ?? ""}
+                onChange={(value) => record.sections[0] && updateSection(record.sections[0].id, { body: value })}
+                tone="light"
+                className="mt-4 text-xl leading-9 text-[#3a2b27]"
+              />
+            </div>
+            <div className="rounded-md border border-[#241a19]/10 bg-[#241a19] p-6 text-white">
+              <p className="eyebrow text-[#dec47b]">SEO Assist</p>
+              <div className="mt-5 grid gap-3 text-sm leading-7 text-white/72">
+                <p>Primary Keyword: 병원 홈페이지 제작</p>
+                <p>Internal CTA: 문의하기 팝업 연결</p>
+                <p>OG / RSS / sitemap 반영 예정</p>
+              </div>
+              <button className="button-primary mt-5 w-full" onClick={() => showToast("Mock SEO checklist confirmed.")} type="button">
+                <CheckCircle2 size={16} />
+                Confirm SEO
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {record.sections.map((section, index) => (
+              <InlineSectionEditor
+                key={section.id}
+                section={section}
+                index={index}
+                tone="light"
+                updateSection={updateSection}
+                moveSection={moveSection}
+                deleteSection={deleteSection}
+              />
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-md border border-[#8a5364]/20 bg-[#241a19] p-6 text-white">
+            <p className="eyebrow text-[#dec47b]">End CTA Block</p>
+            <h3 className="font-display mt-3 text-4xl">병원 홈페이지 제작 문의로 이어지는 마지막 문단</h3>
+            <p className="mt-4 max-w-2xl leading-8 text-[#d9d0c9]">
+              블로그 글마다 CTA, 문의 폼, 내부 링크를 같은 편집 화면에서 확인하는 mock 흐름입니다.
+            </p>
+            <button className="button-outline mt-5" onClick={addSection} type="button">
+              <Plus size={16} />
+              Add Article Block
+            </button>
+          </div>
+        </div>
+      </article>
+    </main>
+  );
+}
+
+function InquiryVisualPreview({
+  record,
+  updateRecord,
+  updateSection,
+  moveSection,
+  deleteSection,
+  addSection,
+  showToast,
+}: {
+  record: DemoRecord;
+  updateRecord: (id: string, patch: Partial<DemoRecord>) => void;
+  updateSection: (sectionId: string, patch: Partial<DemoSection>) => void;
+  moveSection: (index: number, direction: -1 | 1) => void;
+  deleteSection: (id: string) => void;
+  addSection: () => void;
+  showToast: (message: string) => void;
+}) {
+  const replySection = record.sections.find((section) => section.title.toLowerCase().includes("reply")) ?? record.sections[1];
+
+  return (
+    <main className="glass-panel overflow-hidden">
+      <div className="flex flex-col gap-4 border-b border-white/10 p-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="eyebrow text-[#dec47b]">Inquiry Visual Desk</p>
+          <h2 className="font-display mt-2 text-4xl">Support workflow preview</h2>
+        </div>
+        <PreviewStatusControls
+          allowed={["new", "replied"]}
+          status={record.status}
+          onChange={(status) => updateRecord(record.id, { status })}
+        />
+      </div>
+
+      <div className="grid gap-4 p-5 lg:grid-cols-[0.58fr_1fr]">
+        <aside className="rounded-md border border-white/10 bg-black/24 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="eyebrow text-[#dec47b]">Inbox</p>
+              <h3 className="font-display mt-2 text-3xl">Mock queue</h3>
+            </div>
+            <span className="rounded-full border border-[#d62f55]/35 bg-[#d62f55]/15 px-3 py-1 text-xs font-black uppercase text-[#ff9aad]">
+              {record.status}
+            </span>
+          </div>
+          <div className="mt-5 grid gap-3">
+            {["신규 홈페이지 제작", "첨부파일 검토", "답변 초안 작성", "답변 완료 처리"].map((item, index) => (
+              <div key={item} className="rounded-md border border-white/10 bg-white/[0.035] p-4">
+                <p className="text-xs font-black text-[#dec47b]">{String(index + 1).padStart(2, "0")}</p>
+                <p className="mt-2 text-sm font-black text-white">{item}</p>
+                <p className="mt-2 text-xs leading-5 text-white/48">테스트 관리자는 실제 문의 데이터 없이 처리 흐름만 체험합니다.</p>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <section className="rounded-md border border-white/10 bg-[#100d0e]">
+          <div className="relative h-48 overflow-hidden rounded-t-md bg-black/30">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={record.image} alt="" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#100d0e] to-transparent" />
+            <div className="absolute bottom-4 left-5 right-5">
+              <EditableField
+                label="Inquiry title"
+                value={record.title}
+                onChange={(value) => updateRecord(record.id, { title: value })}
+                className="font-display text-4xl text-white"
+              />
+              <EditableField
+                label="Inquiry customer summary"
+                value={record.subtitle}
+                onChange={(value) => updateRecord(record.id, { subtitle: value })}
+                className="mt-2 text-sm font-bold text-white/68"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 p-5 xl:grid-cols-[0.88fr_0.72fr]">
+            <div className="grid gap-4">
+              <div className="rounded-md border border-white/10 bg-white/[0.035] p-5">
+                <p className="eyebrow text-[#dec47b]">Customer Message</p>
+                <EditableField
+                  as="textarea"
+                  rows={6}
+                  label="Original inquiry body"
+                  value={record.sections[0]?.body ?? ""}
+                  onChange={(value) => record.sections[0] && updateSection(record.sections[0].id, { body: value })}
+                  className="mt-4 leading-8 text-[#d9d0c9]"
+                />
+              </div>
+
+              <div className="rounded-md border border-white/10 bg-white/[0.035] p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="eyebrow text-[#dec47b]">Attachments</p>
+                  <button className="button-outline !px-3 !py-2 text-[0.68rem]" onClick={() => showToast("Mock attachment preview opened.")} type="button">
+                    Preview
+                  </button>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="overflow-hidden rounded-md border border-white/10">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={record.image} alt="" className="h-32 w-full object-cover" />
+                  </div>
+                  <div className="rounded-md border border-dashed border-white/16 p-4 text-sm leading-7 text-white/58">
+                    reference-pack.pdf
+                    <br />
+                    existing-site-capture.png
+                    <br />
+                    moodboard.zip
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="rounded-md border border-[#dec47b]/20 bg-[#dec47b]/8 p-5">
+                <p className="eyebrow text-[#dec47b]">Email Reply Composer</p>
+                <EditableField
+                  label="Reply title"
+                  value={replySection?.title ?? "Reply Draft"}
+                  onChange={(value) => replySection && updateSection(replySection.id, { title: value })}
+                  className="font-display mt-3 text-3xl text-white"
+                />
+                <EditableField
+                  as="textarea"
+                  rows={7}
+                  label="Reply body"
+                  value={replySection?.body ?? ""}
+                  onChange={(value) => replySection && updateSection(replySection.id, { body: value })}
+                  className="mt-4 leading-8 text-[#d9d0c9]"
+                />
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button className="button-primary !px-3 !py-3 text-[0.68rem]" onClick={() => updateRecord(record.id, { status: "replied" })} type="button">
+                    Mark Replied
+                  </button>
+                  <button className="button-outline !px-3 !py-3 text-[0.68rem]" onClick={() => showToast("Mock reply saved as draft.")} type="button">
+                    Save Draft
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-white/10 bg-white/[0.035] p-5">
+                <p className="eyebrow text-[#dec47b]">Processing Notes</p>
+                <div className="mt-4 grid gap-3">
+                  {record.sections.slice(1).map((section, index) => (
+                    <InlineSectionEditor
+                      key={section.id}
+                      section={section}
+                      index={index + 1}
+                      updateSection={updateSection}
+                      moveSection={moveSection}
+                      deleteSection={deleteSection}
+                    />
+                  ))}
+                </div>
+                <button className="button-outline mt-4 w-fit" onClick={addSection} type="button">
+                  <Plus size={16} />
+                  Add Handling Note
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }
 
